@@ -292,6 +292,7 @@ class Blockchain:
                     producer_share=round(prod_share, 6),
                     supporters_share=round(supporters_share, 6),
                     supporters_count=supporters_count,
+                    supporter_reward_each=round((supporters_share / supporters_count) if supporters_count > 0 else 0.0, 6),
                     breakdown=breakdown,
                     stakes={k: round(float(v), 6) for k, v in self.stakes.items()},
                 )

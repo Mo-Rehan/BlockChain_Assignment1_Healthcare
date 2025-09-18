@@ -94,8 +94,12 @@ body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100
 
 /* Tabs, metrics, and decorative text */
 [data-baseweb="tabs"] { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--card-border); }
-.stMetric>div>div { font-size: 0.95rem; }
+.stMetric { background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: var(--radius) !important; padding: 14px 16px !important; box-shadow: 0 4px 14px rgba(0,0,0,.25) !important; }
+.stMetric>div>div { font-size: 1.05rem; }
 .stMetric>div>div>span { font-family: 'Share Tech Mono', monospace !important; letter-spacing: .06em; }
+[data-testid="stMetricValue"] { font-size: 2.2rem !important; line-height: 1.1 !important; color: var(--text-main) !important; text-shadow: 0 0 8px rgba(0,230,118,.35) !important; }
+[data-testid="stMetricLabel"] { font-size: 0.95rem !important; color: var(--card-fg) !important; opacity: .95 !important; letter-spacing: .04em !important; }
+[data-testid="stMetricDelta"] { font-size: 0.85rem !important; }
 .seven { font-family: 'Share Tech Mono', monospace; letter-spacing: .08em; text-shadow: 0 0 6px rgba(0,230,118,.4); }
 
 /* Digital chain visuals */

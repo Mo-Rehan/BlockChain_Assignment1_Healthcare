@@ -37,6 +37,13 @@ class Blockchain:
         self.votes: dict[str, str] = {}
         # Round-robin producer pointer for DPoS
         self.producer_pointer: int = 0
+        # Winners-only round-robin pointer (among tied top vote winners)
+        self.winners_pointer: int = 0
+        # Economic parameters
+        self.block_reward: float = 100.0  # total reward per produced block
+        self.share_ratio: float = 0.30    # fraction shared to supporters
+        # Account balances (for doctors/patients/admins)
+        self.balances: dict[str, float] = {}
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -128,21 +135,21 @@ class Blockchain:
         consensus_meta = {"mode": mode}
         producer = None
         if mode == "DPoS":
-            # Round-robin over current delegates (doctors only)
-            candidates = [d for d in self.delegates if self.find_user(d) and not self.is_patient(d)]
-            if candidates:
-                # Ensure pointer in range
-                if self.producer_pointer >= len(candidates) or self.producer_pointer < 0:
-                    self.producer_pointer = 0
-                pointer_before = self.producer_pointer
-                producer = candidates[self.producer_pointer]
-                # Advance pointer
-                self.producer_pointer = (self.producer_pointer + 1) % len(candidates)
-                consensus_meta["schedule"] = candidates
-                consensus_meta["pointer_before"] = pointer_before
-                consensus_meta["pointer_after"] = self.producer_pointer
+            # Winners-only scheduling: compute tied top winners from votes (patients' stake weights)
+            winners = self.get_winners_set()
+            if winners:
+                # Round-robin among winners only
+                if self.winners_pointer >= len(winners) or self.winners_pointer < 0:
+                    self.winners_pointer = 0
+                pointer_before = self.winners_pointer
+                producer = winners[self.winners_pointer]
+                self.winners_pointer = (self.winners_pointer + 1) % len(winners)
+                consensus_meta["winners"] = winners
+                consensus_meta["winner_pointer_before"] = pointer_before
+                consensus_meta["winner_pointer_after"] = self.winners_pointer
             else:
-                producer = None
+                print("No winners from votes. Cannot produce block under winners-only scheduling.")
+                return None
         else:
             print("Only DPoS consensus is supported in this healthcare blockchain.")
             print("Please configure DPoS consensus first.")
@@ -191,6 +198,51 @@ class Blockchain:
             )
         except Exception:
             pass
+
+        # Distribute block rewards: producer keeps (1-share_ratio), supporters (patients who voted for producer) share 'share_ratio' by stake
+        try:
+            total_reward = float(self.block_reward)
+            share_ratio = float(self.share_ratio)
+            prod_share = total_reward * (1.0 - share_ratio)
+            supporters_share = total_reward * share_ratio
+            # credit producer
+            if producer:
+                self.balances[producer] = float(self.balances.get(producer, 0.0)) + prod_share
+            # supporters: voters who voted for producer and are patients
+            supporters = [pid for pid, did in (self.votes or {}).items() if did == producer and self.is_patient(pid)]
+            weights = {pid: float(self.get_stake(pid)) for pid in supporters}
+            total_weight = sum(weights.values())
+            breakdown = {}
+            if total_weight > 0 and supporters_share > 0:
+                for pid, w in weights.items():
+                    amt = supporters_share * (w / total_weight)
+                    if amt <= 0:
+                        continue
+                    self.balances[pid] = float(self.balances.get(pid, 0.0)) + amt
+                    breakdown[pid] = round(amt, 6)
+            else:
+                # no supporters with stake: give all to producer
+                if producer:
+                    self.balances[producer] = float(self.balances.get(producer, 0.0)) + supporters_share
+            # Log reward distribution
+            try:
+                self.log_access(
+                    user_id=producer or "system",
+                    action="REWARD_DISTRIBUTED",
+                    record_id=str(block.index),
+                    success=True,
+                    producer=producer,
+                    total_reward=total_reward,
+                    producer_share=round(prod_share, 6),
+                    supporters_share=round(supporters_share, 6),
+                    supporters_count=len(supporters),
+                    breakdown=breakdown,
+                )
+            except Exception:
+                pass
+        except Exception as e:
+            print("Reward distribution failed:", e)
+
         return block
 
     def log_access(self, user_id, action, record_id, success, reason=None, **metadata):
@@ -250,6 +302,10 @@ class Blockchain:
             "stake_cap": self.stake_cap,
             "votes": self.votes,
             "producer_pointer": self.producer_pointer,
+            "winners_pointer": self.winners_pointer,
+            "block_reward": self.block_reward,
+            "share_ratio": self.share_ratio,
+            "balances": self.balances,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -280,6 +336,12 @@ class Blockchain:
         self.votes = data.get("votes", {})
         # Load round-robin pointer (guard against OOB)
         self.producer_pointer = int(data.get("producer_pointer", 0) or 0)
+        # Load winners pointer
+        self.winners_pointer = int(data.get("winners_pointer", 0) or 0)
+        # Load economic params and balances
+        self.block_reward = float(data.get("block_reward", 100.0))
+        self.share_ratio = float(data.get("share_ratio", 0.30))
+        self.balances = data.get("balances", {})
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -329,12 +391,14 @@ class Blockchain:
         return []
 
     # --- Voting (patients vote for doctor delegates, weighted by patient stake) ---
-    def set_vote(self, patient_id: str, doctor_id: str) -> tuple[bool, str]:
-        if not self.find_user(patient_id) or not self.is_patient(patient_id):
-            return False, "Patient not found"
-        if not self.find_user(doctor_id) or not self.is_doctor(doctor_id):
-            return False, "Doctor not found"
-        self.votes[patient_id] = doctor_id
+    def set_vote(self, voter_id: str, candidate_id: str) -> tuple[bool, str]:
+        # Any registered user can vote
+        if not self.find_user(voter_id):
+            return False, "Voter not found"
+        # Candidate must be a doctor (keeping producer role consistent)
+        if not self.find_user(candidate_id) or not self.is_doctor(candidate_id):
+            return False, "Doctor (candidate) not found"
+        self.votes[voter_id] = candidate_id
         return True, "Vote recorded"
 
     def tally_votes(self) -> dict:
@@ -370,6 +434,29 @@ class Blockchain:
         new_delegates = [did for did, _, _ in ranked[: max(0, int(top_n))]]
         self.delegates = new_delegates
         return new_delegates
+
+    def get_winners_set(self) -> list[str]:
+        """Return the set of doctors that have the maximum vote weight.
+        Sorted deterministically by doctor_id ascending for stable round-robin.
+        """
+        tally = self.tally_votes()
+        if not tally:
+            return []
+        max_w = max(float(meta.get("weight", 0.0)) for meta in tally.values())
+        winners = [did for did, meta in tally.items() if float(meta.get("weight", 0.0)) == max_w and self.is_doctor(did)]
+        winners = sorted(set(winners))
+        return winners
+
+    def current_expected_producer(self) -> tuple[str | None, list[str]]:
+        """Compute the current expected producer without advancing pointers.
+        Returns (producer_id_or_None, winners_list)."""
+        winners = self.get_winners_set()
+        if not winners:
+            return None, winners
+        idx = self.winners_pointer
+        if idx < 0 or idx >= len(winners):
+            idx = 0
+        return winners[idx], winners
 
     def validate_chain(self) -> bool:
         if not self.chain:

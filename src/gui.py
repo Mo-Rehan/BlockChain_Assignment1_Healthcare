@@ -306,6 +306,14 @@ def users_page():
 def consensus_page():
     bc = st.session_state.bc
     st.write("Consensus Mode: " + (bc.consensus_mode or "Not set"))
+    # Show expected producer if available (winners-only scheduling)
+    if bc.consensus_mode == "DPoS" and hasattr(bc, "current_expected_producer"):
+        try:
+            exp, winners = bc.current_expected_producer()
+            if winners:
+                st.info(f"Expected producer: {exp} | Winners (RR set): {', '.join(winners)}")
+        except Exception:
+            pass
     if st.button("Enable DPoS"):
         bc.consensus_mode = "DPoS"; bc.save_state(); st.success("DPoS enabled")
         try:
@@ -529,6 +537,19 @@ def records_page():
             perm_ok, reason = validate_access_permissions(bc, doctor_id, patient_id)
             if not perm_ok:
                 st.error(f"Access denied: {reason}"); bc.log_access(doctor_id, "WRITE", record_id, False, reason=reason); return
+            # Enforce winners-only producer if DPoS
+            if bc.consensus_mode == "DPoS" and hasattr(bc, "current_expected_producer"):
+                try:
+                    exp, winners = bc.current_expected_producer()
+                    if winners and doctor_id != exp:
+                        st.error(f"Only current expected producer can add a block right now. Expected: {exp}")
+                        try:
+                            bc.log_access(doctor_id, "WRITE", record_id, False, reason="not_current_producer", expected=exp)
+                        except Exception:
+                            pass
+                        return
+                except Exception:
+                    pass
             blk = bc.add_block_with_consensus([tx])
             if blk:
                 st.success(f"Added in block {blk.index}")
@@ -574,6 +595,19 @@ def records_page():
                 except Exception:
                     pass
                 return
+            # Enforce winners-only producer for emergency as well
+            if bc.consensus_mode == "DPoS" and hasattr(bc, "current_expected_producer"):
+                try:
+                    exp, winners = bc.current_expected_producer()
+                    if winners and ed.strip() != exp:
+                        st.error(f"Only current expected producer can add a block right now. Expected: {exp}")
+                        try:
+                            bc.log_access(ed.strip(), "EMERGENCY_WRITE", er.strip(), False, reason="not_current_producer", expected=exp)
+                        except Exception:
+                            pass
+                        return
+                except Exception:
+                    pass
             tx = {
                 "hospital_id": eh.strip(),
                 "doctor_id": ed.strip(),

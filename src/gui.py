@@ -391,18 +391,24 @@ def consensus_page():
 
     st.markdown("---")
     st.subheader("Voting (Patients vote for Doctor Delegates)")
-    # Voting form: patient chooses a doctor to vote for. Vote weight = patient stake.
-    pat_ids = [p.get("id") for p in bc.users.get("patients", [])]
+    # Voting form: any registered user chooses a doctor to vote for. Vote weight = voter's stake.
+    all_voters = (
+        [(u.get("id"), u.get("name"), "patient") for u in bc.users.get("patients", [])]
+        + [(u.get("id"), u.get("name"), "doctor") for u in bc.users.get("doctors", [])]
+        + [(u.get("id"), u.get("name"), "admin") for u in bc.users.get("admins", [])]
+    )
     doc_ids = [d.get("id") for d in bc.users.get("doctors", [])]
-    if not pat_ids or not doc_ids:
+    if not all_voters or not doc_ids:
         st.info("Register at least one patient and one doctor to enable voting.")
     else:
         c1, c2, c3 = st.columns([1,1,1])
+        voter_options = {vid: f"{role.title()}: {vid} - {name} (stake={bc.get_stake(vid)})" for vid, name, role in all_voters}
+        doc_options = {did: f"Doctor: {did} (stake={bc.get_stake(did)})" for did in doc_ids}
         with c1:
-            v_pid = st.selectbox("Patient (voter)", pat_ids, key="vote_pid")
+            v_pid = st.selectbox("Voter", list(voter_options.keys()), format_func=lambda k: voter_options[k], key="vote_pid")
             st.caption(f"Stake weight: {bc.get_stake(v_pid)}")
         with c2:
-            v_did = st.selectbox("Doctor (candidate)", doc_ids, key="vote_did")
+            v_did = st.selectbox("Doctor (candidate)", list(doc_options.keys()), format_func=lambda k: doc_options[k], key="vote_did")
         with c3:
             if st.button("Cast Vote"):
                 try:
@@ -438,6 +444,9 @@ def consensus_page():
                     except Exception:
                         pass
 
+    # Manual refresh (useful after rewards update to see new stakes reflected immediately)
+    st.button("Refresh Tallies")
+
     # Show weighted tally
     tally = bc.tally_votes() if hasattr(bc, "tally_votes") else {}
     if tally:
@@ -453,6 +462,31 @@ def consensus_page():
         st.table(sorted(rows, key=lambda r: (-r["weight"], r["doctor"])) )
     else:
         st.caption("No votes yet.")
+
+    # Current votes table for transparency
+    try:
+        if hasattr(bc, "votes") and bc.votes:
+            vote_rows = []
+            for voter, cand in bc.votes.items():
+                # find voter role/name
+                role = "-"; name = voter
+                for role_name in ("patients", "doctors", "admins"):
+                    u = next((x for x in bc.users.get(role_name, []) if x.get("id") == voter), None)
+                    if u:
+                        role = "doctor" if role_name == "doctors" else ("patient" if role_name == "patients" else "admin")
+                        name = u.get("name")
+                        break
+                vote_rows.append({
+                    "voter": voter,
+                    "name": name,
+                    "role": role,
+                    "stake": bc.get_stake(voter),
+                    "voted_for": cand,
+                })
+            st.markdown("### Current Votes")
+            st.table(vote_rows)
+    except Exception:
+        pass
 
     # Select delegates from votes with tie-breaker
     c1, c2 = st.columns([1,1])

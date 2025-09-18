@@ -20,6 +20,12 @@ How to run (CLI)
 2) Start the CLI:
    python -m src.main
 
+How to run (Streamlit)
+1) Install requirements (Python 3.8+):
+   pip install -r requirements.txt
+2) Start the CLI:
+   python -m src.gui
+
 Basic steps
 1) Create genesis
 2) Register users

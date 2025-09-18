@@ -717,19 +717,37 @@ def admin_page():
         # Cap controls
         cap_col1, cap_col2 = st.columns([1,1])
         with cap_col1:
-            current_cap = bc.stake_cap if bc.stake_cap is not None else "(no cap)"
+            cap_val = getattr(bc, "stake_cap", None)
+            current_cap = cap_val if cap_val is not None else "(no cap)"
             st.write(f"Current stake cap: {current_cap}")
-            cap_in = st.text_input("Set stake cap (blank to disable)", value=str(bc.stake_cap) if bc.stake_cap is not None else "")
+            cap_in = st.text_input("Set stake cap (blank to disable)", value=str(cap_val) if cap_val is not None else "")
         with cap_col2:
             if st.button("Apply Cap"):
+                # Support older session objects that may not have set_stake_cap
+                def _apply_cap(v):
+                    if hasattr(bc, "set_stake_cap"):
+                        return bc.set_stake_cap(v)
+                    # Fallback validation if method missing
+                    if v is None:
+                        setattr(bc, "stake_cap", None)
+                        return True, "Stake cap disabled"
+                    try:
+                        value = float(v)
+                    except Exception:
+                        return False, "Cap must be a number"
+                    if value < 0:
+                        return False, "Cap cannot be negative"
+                    setattr(bc, "stake_cap", value)
+                    return True, "Stake cap set"
+
                 if cap_in.strip() == "":
-                    ok, msg = bc.set_stake_cap(None)
+                    ok, msg = _apply_cap(None)
                 else:
-                    ok, msg = bc.set_stake_cap(cap_in)
+                    ok, msg = _apply_cap(cap_in)
                 if ok:
                     bc.save_state(); st.success(msg)
                     try:
-                        bc.log_access("admin", "STAKE_CAP_SET", "-", True, cap=bc.stake_cap)
+                        bc.log_access("admin", "STAKE_CAP_SET", "-", True, cap=getattr(bc, "stake_cap", None))
                     except Exception:
                         pass
                 else:

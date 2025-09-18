@@ -394,9 +394,21 @@ def records_page():
             blk = bc.add_block_with_consensus([tx])
             if blk:
                 st.success(f"Added in block {blk.index}")
-                # Log successful write
+                # Log successful write with rich metadata
                 try:
-                    bc.log_access(doctor_id, "WRITE", record_id.strip(), True)
+                    bc.log_access(
+                        doctor_id,
+                        "WRITE",
+                        record_id.strip(),
+                        True,
+                        record_type=record_type,
+                        operation=operation,
+                        amount=amount.strip(),
+                        hospital_id=hospital_id.strip(),
+                        insurance_id=insurance_id.strip(),
+                        patient_id=patient_id.strip(),
+                        block_index=blk.index,
+                    )
                 except Exception:
                     pass
                 bc.save_state()
@@ -418,7 +430,12 @@ def records_page():
             esub = st.form_submit_button("Add Emergency Record")
         if esub:
             if code != "EMERGENCY_2024":
-                st.error("Invalid code"); return
+                st.error("Invalid code");
+                try:
+                    bc.log_access(ed.strip(), "EMERGENCY_WRITE", er.strip(), False, reason="invalid_code", hospital_id=eh.strip(), patient_id=ep.strip(), insurance_id=ei.strip(), amount=ea.strip())
+                except Exception:
+                    pass
+                return
             tx = {
                 "hospital_id": eh.strip(),
                 "doctor_id": ed.strip(),
@@ -438,7 +455,10 @@ def records_page():
                 st.error(msg); return
             blk = st.session_state.bc.add_block_with_consensus([tx])
             if blk:
-                bc.log_access(ed, "EMERGENCY_WRITE", er, True, reason="emergency_override")
+                try:
+                    bc.log_access(ed.strip(), "EMERGENCY_WRITE", er.strip(), True, reason="emergency_override", block_index=blk.index, hospital_id=eh.strip(), patient_id=ep.strip(), insurance_id=ei.strip(), amount=ea.strip())
+                except Exception:
+                    pass
                 st.success(f"Emergency record in block {blk.index}"); bc.save_state()
             else:
                 st.error("Failed to add emergency record")
@@ -723,6 +743,8 @@ def logs_page():
             ),
             unsafe_allow_html=True,
         )
+        with st.expander("Details (JSON)"):
+            st.code(json.dumps(e, indent=2), language="json")
 
     # Export buttons
     json_bytes = json.dumps(logs, indent=2).encode("utf-8")

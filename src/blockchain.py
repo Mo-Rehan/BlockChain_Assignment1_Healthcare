@@ -87,6 +87,22 @@ class Blockchain:
         block.consensus_data = {"type": "genesis"}
         self.chain.append(block)
         print("Genesis block created.")
+        # Log genesis block creation with metadata
+        try:
+            self.log_access(
+                user_id="system",
+                action="BLOCK_ADDED",
+                record_id="genesis",
+                success=True,
+                index=block.index,
+                hash=block.hash(),
+                prev_hash=block.prev_hash,
+                merkle_root=block.merkle_root,
+                consensus_data=block.consensus_data,
+                tx_count=len(block.transactions),
+            )
+        except Exception:
+            pass
 
     def add_block_with_consensus(self, transactions):
         if not self.chain:
@@ -149,17 +165,40 @@ class Blockchain:
             return None
 
         print(f"Block {block.index} added by producer: {producer} (mode: {mode})")
+        # Log block added with full metadata
+        try:
+            self.log_access(
+                user_id=producer or "system",
+                action="BLOCK_ADDED",
+                record_id=str(block.index),
+                success=True,
+                index=block.index,
+                hash=block.hash(),
+                prev_hash=block.prev_hash,
+                merkle_root=block.merkle_root,
+                consensus_mode=mode,
+                consensus_data=consensus_meta,
+                tx_count=len(block.transactions),
+                transactions=block.transactions,
+            )
+        except Exception:
+            pass
         return block
 
-    def log_access(self, user_id, action, record_id, success, reason=None):
+    def log_access(self, user_id, action, record_id, success, reason=None, **metadata):
         entry = {
             "timestamp": time.ctime(),
             "user_id": user_id,
             "action": action,
             "record_id": record_id,
             "success": success,
-            "reason": reason
+            "reason": reason,
         }
+        # Merge extra metadata fields into the log entry
+        for k, v in (metadata or {}).items():
+            # avoid overwriting core keys unless explicitly intended
+            if k not in entry or k in ("reason",):
+                entry[k] = v
         self.access_logs.append(entry)
 
     def find_user(self, uid):

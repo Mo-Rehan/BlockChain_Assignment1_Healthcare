@@ -266,6 +266,8 @@ class Blockchain:
         # Load stakes
         self.stakes = data.get("stakes", {})
         self.stake_cap = data.get("stake_cap")
+        # Enforce cap on loaded stakes if needed
+        self.enforce_stake_cap()
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -317,7 +319,31 @@ class Blockchain:
         if value < 0:
             return False, "Cap cannot be negative"
         self.stake_cap = value
-        return True, "Stake cap set"
+        # Clamp existing stakes above the cap
+        adjusted = self.enforce_stake_cap()
+        msg = "Stake cap set"
+        if adjusted:
+            msg += f"; clamped {len(adjusted)} stake(s) to {value}"
+        return True, msg
+
+    def enforce_stake_cap(self):
+        """Clamp any existing stakes to the current stake_cap. Returns list of user_ids adjusted."""
+        adjusted = []
+        try:
+            if self.stake_cap is None:
+                return adjusted
+            cap_val = float(self.stake_cap)
+            for uid, amt in list(self.stakes.items()):
+                try:
+                    f = float(amt)
+                except Exception:
+                    f = 0.0
+                if f > cap_val:
+                    self.stakes[uid] = cap_val
+                    adjusted.append(uid)
+        except Exception:
+            pass
+        return adjusted
 
     def validate_chain(self) -> bool:
         if not self.chain:

@@ -738,7 +738,17 @@ def admin_page():
                     if value < 0:
                         return False, "Cap cannot be negative"
                     setattr(bc, "stake_cap", value)
-                    return True, "Stake cap set"
+                    # Try to clamp existing stakes
+                    adjusted = []
+                    if hasattr(bc, "enforce_stake_cap"):
+                        try:
+                            adjusted = bc.enforce_stake_cap()
+                        except Exception:
+                            adjusted = []
+                    msg = "Stake cap set"
+                    if adjusted:
+                        msg += f"; clamped {len(adjusted)} stake(s) to {value}"
+                    return True, msg
 
                 if cap_in.strip() == "":
                     ok, msg = _apply_cap(None)

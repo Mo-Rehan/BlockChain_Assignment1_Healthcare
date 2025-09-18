@@ -181,15 +181,31 @@ def dashboard():
             ok, msg = ext_validate_chain(bc)
             if ok:
                 st.success("Chain integrity validated")
+                try:
+                    bc.log_access("system", "VALIDATE_CHAIN", "-", True)
+                except Exception:
+                    pass
             else:
                 st.error("Chain integrity failed")
+                try:
+                    bc.log_access("system", "VALIDATE_CHAIN", "-", False, reason=msg)
+                except Exception:
+                    pass
     with c2:
         if st.button("Validate Consensus"):
             ok, msg = validate_consensus_integrity(bc)
             if ok:
                 st.success("Consensus integrity validated")
+                try:
+                    bc.log_access("system", "VALIDATE_CONSENSUS", "-", True)
+                except Exception:
+                    pass
             else:
                 st.error("Consensus integrity failed")
+                try:
+                    bc.log_access("system", "VALIDATE_CONSENSUS", "-", False, reason=msg)
+                except Exception:
+                    pass
 
 
 def users_page():
@@ -283,18 +299,38 @@ def consensus_page():
     st.write("Consensus Mode: " + (bc.consensus_mode or "Not set"))
     if st.button("Enable DPoS"):
         bc.consensus_mode = "DPoS"; bc.save_state(); st.success("DPoS enabled")
+        try:
+            bc.log_access("system", "CONSENSUS_ENABLE", "DPoS", True)
+        except Exception:
+            pass
 
     delegate_id = st.text_input("Add Delegate (ID)")
     if st.button("Add Delegate"):
         if not delegate_id or not bc.find_user(delegate_id):
             st.error("Delegate must be a registered user")
+            try:
+                bc.log_access(delegate_id or "", "DELEGATE_ADD", delegate_id or "", False, reason="not_registered")
+            except Exception:
+                pass
         elif hasattr(bc, "is_patient") and bc.is_patient(delegate_id):
             st.error("Patients cannot be delegates")
+            try:
+                bc.log_access(delegate_id, "DELEGATE_ADD", delegate_id, False, reason="patient_not_allowed")
+            except Exception:
+                pass
         elif delegate_id in bc.delegates:
             st.warning("Already a delegate")
+            try:
+                bc.log_access(delegate_id, "DELEGATE_ADD", delegate_id, False, reason="already_delegate")
+            except Exception:
+                pass
         else:
             bc.delegates.append(delegate_id)
             bc.save_state(); st.success("Delegate added")
+            try:
+                bc.log_access(delegate_id, "DELEGATE_ADD", delegate_id, True)
+            except Exception:
+                pass
 
     if bc.delegates:
         st.write("Delegates:", ", ".join(bc.delegates))
@@ -302,8 +338,17 @@ def consensus_page():
         if st.button("Remove Selected") and to_remove:
             bc.delegates = [d for d in bc.delegates if d not in to_remove]
             bc.save_state(); st.success("Removed selected delegates")
+            try:
+                for d in to_remove:
+                    bc.log_access(d, "DELEGATE_REMOVE", d, True)
+            except Exception:
+                pass
     if st.button("Reset DPoS"):
         bc.consensus_mode = None; bc.delegates.clear(); bc.save_state(); st.info("DPoS reset")
+        try:
+            bc.log_access("system", "CONSENSUS_RESET", "DPoS", True)
+        except Exception:
+            pass
 
 
 def records_page():
@@ -577,21 +622,37 @@ def admin_page():
     if not bc.chain:
         if st.button("Create Genesis Block"):
             bc.create_genesis(); bc.save_state(); st.success("Genesis created")
+            try:
+                bc.log_access("system", "GENESIS_CREATE", "-", True)
+            except Exception:
+                pass
     c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("Validate Chain (built-in)"):
             ok = bc.validate_chain()
             st.success("Chain valid") if ok else st.error("Chain invalid")
+            try:
+                bc.log_access("system", "VALIDATE_CHAIN_BUILTIN", "-", bool(ok))
+            except Exception:
+                pass
     with c2:
         confirm = st.checkbox("Confirm fix before running")
         if st.button("Fix Chain Links/Merkle"):
             if confirm:
                 bc.fix_chain_integrity()
+                try:
+                    bc.log_access("system", "FIX_CHAIN", "-", True)
+                except Exception:
+                    pass
             else:
                 st.warning("Please confirm before fixing")
     with c3:
         if st.button("Save State"):
             bc.save_state(); st.success("Saved")
+            try:
+                bc.log_access("system", "SAVE_STATE", "-", True)
+            except Exception:
+                pass
 
     # Logs moved to separate Logs page
 
@@ -637,11 +698,17 @@ def logs_page():
         st.info("No logs match the filters.")
         return
 
-    # Pretty cards
+    # Pretty cards with all fields
     for e in logs:
         ok = bool(e.get("success"))
         badge = "✅ Success" if ok else "❌ Failed"
-        reason = e.get("reason")
+        # Build key-value HTML for all fields except timestamp/success (shown separately)
+        rows = []
+        for k, v in sorted(e.items()):
+            if k in ("timestamp", "success"):
+                continue
+            rows.append(f"<div class='kv'>{k}: {v}</div>")
+        body_html = "\n".join(rows)
         st.markdown(
             textwrap.dedent(
                 f"""
@@ -650,10 +717,7 @@ def logs_page():
                         <span class='log-time'>{e.get('timestamp','')}</span>
                         <span class='log-badge {'ok' if ok else 'fail'}'>{badge}</span>
                     </div>
-                    <div class='kv'>user: {e.get('user_id','-')}</div>
-                    <div class='kv'>action: {e.get('action','-')}</div>
-                    <div class='kv'>target: {e.get('record_id','-')}</div>
-                    {f"<div class='kv'>reason: {reason}</div>" if reason else ''}
+                    {body_html}
                 </div>
                 """
             ),

@@ -32,17 +32,98 @@ def init_app_state():
 
 
 def app_header():
-    st.markdown(
-        """
+    # Hardcoded theme values for dark mode
+    accent, font, radius, scale, dark = "#00E676", "Share Tech Mono (Digital)", 10, 100, True
+    google_font_map = {
+        "Orbitron (Digital)": ("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&display=swap", "'Orbitron', sans-serif"),
+        "Share Tech Mono (Digital)": ("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap", "'Share Tech Mono', monospace"),
+        "VT323 (Retro)": ("https://fonts.googleapis.com/css2?family=VT323&display=swap", "'VT323', monospace"),
+        "Inter": ("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap", "'Inter', sans-serif"),
+        "Roboto": ("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap", "'Roboto', sans-serif"),
+        "Source Sans 3": ("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap", "'Source Sans 3', sans-serif"),
+        "System Default": ("", "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"),
+    }
+    google_font_url, font_family = google_font_map.get(font, ("", "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif"))
+    imports = f"@import url('{google_font_url}');" if google_font_url else ""
+    imports += "@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');"
+    # Colors for modes
+    header_bg = "linear-gradient(90deg, #071018, #0b1220)" if dark else "linear-gradient(90deg, #eafaf0, #e2fff4)"
+    body_g1, body_g2 = ("#0f172a", "#111827") if dark else ("#f7f8fc", "#eef1f7")
+    text_main = "#00e676" if dark else "#0b1220"
+    card_bg = "#0b1220" if dark else "#ffffff"
+    card_fg = "#d7ffe6" if dark else "#0b1220"
+    card_border = "#0f1b2d" if dark else "#e8ecf3"
+    btn_text = "#071018" if dark else "#ffffff"
+    node_bg = "#071018" if dark else "#ffffff"
+
+    # Compose CSS in two parts to avoid f-string brace conflicts
+    style_vars = f"""
         <style>
-        .app-header {background: linear-gradient(90deg,#4158D0 0%,#C850C0 46%,#FFCC70 100%); 
-            color:white; padding:18px; border-radius:12px; margin-bottom:16px}
-        .card {background:white; padding:16px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08);}
+        {imports}
+        :root {{
+          --accent: {accent};
+          --radius: {radius}px;
+          --font: {font_family};
+          --scale: {scale}%;
+          --header-bg: {header_bg};
+          --body-g1: {body_g1};
+          --body-g2: {body_g2};
+          --text-main: {text_main};
+          --card-bg: {card_bg};
+          --card-fg: {card_fg};
+          --card-border: {card_border};
+          --btn-text: {btn_text};
+          --node-bg: {node_bg};
+        }}
+    """
+    static_css = """
+        html, body, [class*="css"] { font-family: var(--font) !important; font-size: calc(16px * var(--scale)/100); }
+        .app-header { background: var(--header-bg); border: 1px solid var(--card-border); color: var(--text-main); padding:18px; border-radius:12px; margin-bottom:16px; text-shadow: 0 0 6px rgba(0,230,118,.5); letter-spacing:.5px; }
+        .card { background: var(--card-bg); color: var(--card-fg); padding:16px; border-radius:var(--radius); box-shadow:0 2px 8px rgba(0,0,0,.08); border:1px solid var(--card-border); }
+        .block-card { background: var(--card-bg); color: var(--card-fg); padding:14px; border-radius:var(--radius); box-shadow:0 1px 6px rgba(0,0,0,.3); margin-bottom:10px; border:1px solid var(--card-border) }
+        body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+        .stApp { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+        /* Force dark background across app containers */
+        [data-testid="stAppViewContainer"] { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+        [data-testid="stHeader"], [data-testid="stToolbar"] { background: transparent !important; }
+        [data-testid="stSidebar"] { background: var(--node-bg) !important; border-right: 1px solid var(--card-border); }
+        .block-container { background: transparent !important; }
+        /* Make general text readable on dark */
+        .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }
+        [data-testid="stMarkdownContainer"] * { color: var(--card-fg) !important; }
+        .stExpander, .stExpander p, .stExpander div, .stExpander span { color: var(--card-fg) !important; }
+        /* Ensure explorer page text is visible */
+        .stMarkdown p, .stMarkdown pre, .stMarkdown code, .stMarkdown div { color: var(--card-fg) !important; }
+        .stMarkdown pre { background-color: var(--node-bg) !important; border: 1px solid var(--card-border) !important; }
+        /* Force text color for all direct children in explorer */
+        .stMarkdown > * { color: var(--card-fg) !important; }
+        /* Specific fix for index and nonce values */
+        .stMarkdown code { color: var(--text-main) !important; font-weight: bold; }
+        /* Style download buttons to match other buttons */
+        .stDownloadButton > button { background: var(--accent) !important; color: var(--btn-text) !important; border: none !important; border-radius: var(--radius) !important; padding: 0.5rem 1rem !important; font-weight: 600 !important; }
+        .stDownloadButton > button:hover { opacity: 0.9 !important; }
+        .stButton>button { background: var(--accent); color: var(--btn-text); border: none; border-radius: var(--radius); padding: .5rem 1rem; font-weight:600; }
+        .stButton>button:hover { opacity: .95; box-shadow: 0 0 0 3px rgba(0,0,0,.05) inset; }
+        /* Inputs and selects in dark */
+        .stTextInput>div>div>input, .stTextArea textarea { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
+        /* Labels and placeholders readable on dark */
+        .stTextInput label, .stTextArea label, .stSelectbox label, label { color: var(--card-fg) !important; }
+        .stTextInput input::placeholder, .stTextArea textarea::placeholder { color: rgba(215,255,230,.6) !important; }
+        .stSelectbox>div>div { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
+        [data-baseweb="tabs"] { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--card-border); }
+        .stMetric>div>div { font-size: 0.95rem; }
+        .stMetric>div>div>span { font-family: 'Share Tech Mono', monospace !important; letter-spacing: .06em; }
+        .seven { font-family: 'Share Tech Mono', monospace; letter-spacing: .08em; text-shadow: 0 0 6px rgba(0,230,118,.4); }
+        /* Digital chain visuals */
+        .chain-wrap { display:flex; gap:20px; align-items:center; overflow-x:auto; padding: 10px 2px; }
+        .chain-node { min-width: 260px; background: var(--node-bg); color: var(--text-main); border:1px solid var(--card-border); border-radius:var(--radius); padding:12px; box-shadow:0 2px 8px rgba(0,0,0,.5); }
+        .chain-node h4 { margin: 0 0 8px 0; font-weight:700; letter-spacing:.12em; text-shadow: 0 0 5px rgba(0,230,118,.6); }
+        .chain-node .kv { font-family: 'Share Tech Mono', monospace; font-size: .9rem; }
+        .connector { height: 2px; width: 60px; background: linear-gradient(90deg, #0f1b2d, var(--accent)); box-shadow: 0 0 6px rgba(0,230,118,.6); border-radius: 2px; }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown('<div class="app-header"><h2>Healthcare Blockchain</h2><p>DPoS • Verified Blocks • Merkle Root</p></div>', unsafe_allow_html=True)
+    """
+    st.markdown(style_vars + static_css, unsafe_allow_html=True)
+    st.markdown('<div class="app-header"><h2 class="seven">HEALTHCARE BLOCKCHAIN</h2><p class="seven">DPoS • VERIFIED BLOCKS • MERKLE ROOT</p></div>', unsafe_allow_html=True)
 
 
 def dashboard():
@@ -98,8 +179,14 @@ def users_page():
 
         st.markdown("---")
         st.write("Users:")
-        for role in ("doctors", "patients", "admins"):
-            st.write(f"- {role}: {[u['id'] for u in bc.users[role]]}")
+        cols = st.columns(3)
+        for i, role in enumerate(("doctors", "patients", "admins")):
+            with cols[i]:
+                entries = bc.users[role]
+                if entries:
+                    st.table([{k: v for k, v in u.items() if k != "consent"} for u in entries])
+                else:
+                    st.info(f"No {role} registered")
 
     with t2:
         patients = [p["id"] for p in bc.users["patients"]]
@@ -148,6 +235,10 @@ def consensus_page():
 
     if bc.delegates:
         st.write("Delegates:", ", ".join(bc.delegates))
+        to_remove = st.multiselect("Remove delegates", bc.delegates)
+        if st.button("Remove Selected") and to_remove:
+            bc.delegates = [d for d in bc.delegates if d not in to_remove]
+            bc.save_state(); st.success("Removed selected delegates")
     if st.button("Reset DPoS"):
         bc.consensus_mode = None; bc.delegates.clear(); bc.save_state(); st.info("DPoS reset")
 
@@ -161,8 +252,10 @@ def records_page():
             c1, c2 = st.columns(2)
             with c1:
                 hospital_id = st.text_input("Hospital ID")
-                doctor_id = st.text_input("Doctor ID")
-                patient_id = st.text_input("Patient ID")
+                doctor_ids = [d["id"] for d in bc.users["doctors"]]
+                patient_ids = [p["id"] for p in bc.users["patients"]]
+                doctor_id = st.selectbox("Doctor", doctor_ids) if doctor_ids else st.text_input("Doctor ID")
+                patient_id = st.selectbox("Patient", patient_ids) if patient_ids else st.text_input("Patient ID")
                 insurance_id = st.text_input("Insurance ID (optional)")
             with c2:
                 record_id = st.text_input("Record ID")
@@ -241,6 +334,30 @@ def explorer_page():
     if not bc.chain:
         st.info("Create a genesis block first from the CLI or by adding a record")
         return
+    st.subheader("Filters")
+    fc1, fc2, fc3 = st.columns([1,1,1])
+    with fc1:
+        filter_record = st.text_input("Filter by record_id")
+    with fc2:
+        filter_patient = st.text_input("Filter by patient_id")
+    with fc3:
+        apply_filters = st.checkbox("Apply filters", value=bool(filter_record or filter_patient))
+
+    if apply_filters and (filter_record or filter_patient):
+        count = 0
+        for blk in bc.chain:
+            for tx in blk.transactions:
+                if filter_record and tx.get("record_id") != filter_record:
+                    continue
+                if filter_patient and tx.get("patient_id") != filter_patient:
+                    continue
+                count += 1
+                with st.container():
+                    st.markdown(f"<div class='block-card'><b>Block</b>: {blk.index} &nbsp; <b>Time</b>: {blk.timestamp} &nbsp; <b>Hash</b>: {blk.hash()}</div>", unsafe_allow_html=True)
+                    st.json(tx)
+        if count == 0:
+            st.info("No matching transactions found")
+        return
     idx = st.selectbox("Select Block", list(range(len(bc.chain))))
     blk = bc.chain[idx]
     c1, c2 = st.columns(2)
@@ -259,6 +376,69 @@ def explorer_page():
             st.json(tx)
 
 
+def chain_page():
+    bc = st.session_state.bc
+    if not bc.chain:
+        st.info("Create a genesis block first from Admin page or by adding a record")
+        return
+
+    show_full = st.checkbox("Show full hashes", value=False)
+
+    def fmt(s: str) -> str:
+        if show_full or not s:
+            return s
+        return (s[:10] + "…" + s[-6:]) if len(s) > 18 else s
+
+    html = ["<div class='chain-wrap'>"]
+    for i, blk in enumerate(bc.chain):
+        try:
+            bhash = blk.hash()
+        except Exception:
+            bhash = ""
+        mode = "-"
+        producer = "-"
+        if isinstance(getattr(blk, "consensus_data", None), dict):
+            mode = blk.consensus_data.get("mode", "-")
+            producer = blk.consensus_data.get("producer", "-")
+
+        node = f"""
+        <div class='chain-node'>
+            <h4>BLOCK {blk.index}</h4>
+            <div class='kv'>time: {blk.timestamp}</div>
+            <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
+            <div class='kv'>hash: {fmt(bhash)}</div>
+            <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
+            <div class='kv'>mode: {mode} | producer: {producer}</div>
+            <div class='kv'>tx: {len(blk.transactions)}</div>
+        </div>
+        """
+        html.append(node)
+        if i < len(bc.chain) - 1:
+            html.append("<div class='connector'></div>")
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+    # Export chain view
+    export = [
+        {
+            "index": blk.index,
+            "timestamp": blk.timestamp,
+            "prev_hash": blk.prev_hash,
+            "hash": (blk.hash() if hasattr(blk, "hash") else ""),
+            "merkle_root": blk.merkle_root,
+            "consensus_data": blk.consensus_data,
+            "tx_count": len(blk.transactions),
+        }
+        for blk in bc.chain
+    ]
+    st.download_button(
+        "Download Chain (JSON)",
+        data=json.dumps(export, indent=2).encode("utf-8"),
+        file_name=f"healthcare_blockchain_{int(time.time())}.json",
+        mime="application/json",
+    )
+
+
 def admin_page():
     bc = st.session_state.bc
     if not bc.chain:
@@ -270,8 +450,12 @@ def admin_page():
             ok = bc.validate_chain()
             st.success("Chain valid") if ok else st.error("Chain invalid")
     with c2:
+        confirm = st.checkbox("Confirm fix before running")
         if st.button("Fix Chain Links/Merkle"):
-            bc.fix_chain_integrity()
+            if confirm:
+                bc.fix_chain_integrity()
+            else:
+                st.warning("Please confirm before fixing")
     with c3:
         if st.button("Save State"):
             bc.save_state(); st.success("Saved")
@@ -280,16 +464,34 @@ def admin_page():
     if not bc.access_logs:
         st.info("No logs")
     else:
-        for log in reversed(bc.access_logs[-50:]):
+        logs = list(reversed(bc.access_logs[-200:]))
+        for log in logs:
             st.write(json.dumps(log))
+        # Export buttons
+        json_bytes = json.dumps(logs, indent=2).encode("utf-8")
+        st.download_button("Download Logs (JSON)", data=json_bytes, file_name="access_logs.json", mime="application/json")
+        # Build CSV
+        if logs:
+            keys = sorted({k for entry in logs for k in entry.keys()})
+            rows = [",".join(keys)]
+            for entry in logs:
+                row = []
+                for k in keys:
+                    v = entry.get(k, "")
+                    v = str(v).replace(",", ";")
+                    row.append(v)
+                rows.append(",".join(row))
+            csv_bytes = ("\n".join(rows)).encode("utf-8")
+            st.download_button("Download Logs (CSV)", data=csv_bytes, file_name="access_logs.csv", mime="text/csv")
 
 
 def main():
     init_app_state()
     app_header()
-    page = st.sidebar.selectbox(
+    page = st.sidebar.radio(
         "Navigate",
-        ["Dashboard", "Users", "Records", "Consensus", "Explorer", "Admin"],
+        ["Dashboard", "Users", "Records", "Consensus", "Explorer", "Chain", "Admin"],
+        index=0,
     )
     if page == "Dashboard":
         dashboard()
@@ -301,6 +503,8 @@ def main():
         consensus_page()
     elif page == "Explorer":
         explorer_page()
+    elif page == "Chain":
+        chain_page()
     else:
         admin_page()
 

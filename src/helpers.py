@@ -1,34 +1,46 @@
-# Helper functions for healthcare blockchain
+"""
+Hashing utilities for the healthcare ledger.
+
+All functions are deterministic and side-effect free.
+"""
 import hashlib
 import json
+from typing import List
 
 
-def compute_transaction_fingerprint(healthcare_record):
-    normalized_record = json.dumps(healthcare_record, sort_keys=True, separators=(',', ':'))
-    hash_object = hashlib.sha256(normalized_record.encode('utf-8'))
-    return hash_object.hexdigest()
+def _normalize_tx(record: dict) -> str:
+    """Serialize a transaction dict into a canonical JSON string."""
+    return json.dumps(record, sort_keys=True, separators=(",", ":"))
 
 
-def build_merkle_tree_root(medical_tx_fingerprints):
+def compute_transaction_fingerprint(healthcare_record: dict) -> str:
+    """Return a SHA-256 hex digest over a canonical JSON representation of the record."""
+    normalized = _normalize_tx(healthcare_record)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def build_merkle_tree_root(medical_tx_fingerprints: List[str]) -> str:
+    """Compute a simple Merkle root over a list of transaction hash strings.
+
+    If the number of nodes is odd, the last node is duplicated at each level.
+    """
     if not medical_tx_fingerprints:
-        return hashlib.sha256(b'').hexdigest()
+        return hashlib.sha256(b"").hexdigest()
 
-    current_level = medical_tx_fingerprints.copy()
-
-    while len(current_level) > 1:
-        if len(current_level) % 2 == 1:
-            current_level.append(current_level[-1])
-
+    level = list(medical_tx_fingerprints)
+    while len(level) > 1:
+        if len(level) % 2 == 1:
+            level.append(level[-1])
         next_level = []
-        for i in range(0, len(current_level), 2):
-            combined = current_level[i] + current_level[i + 1]
-            parent_hash = hashlib.sha256(combined.encode('utf-8')).hexdigest()
-            next_level.append(parent_hash)
+        for i in range(0, len(level), 2):
+            pair = (level[i], level[i + 1])
+            parent = hashlib.sha256((pair[0] + pair[1]).encode("utf-8")).hexdigest()
+            next_level.append(parent)
+        level = next_level
 
-        current_level = next_level
-
-    return current_level[0]
+    return level[0]
 
 
-def encryptionmethodLondon(doctors_list):
-    return len(doctors_list)
+def encryptionmethodLondon(doctors_list) -> int:
+    """Return the count of registered doctors (required by assignment interface)."""
+    return int(len(doctors_list))

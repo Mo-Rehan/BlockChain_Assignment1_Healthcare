@@ -32,6 +32,25 @@ def init_app_state():
         st.session_state.bc = bc
 
 
+def _stake_at_block(bc: "Blockchain", block_index: int, producer_id: str) -> float:
+    """Return the producer's stake as of the time the given block was produced.
+    Uses the REWARD_DISTRIBUTED summary log snapshot for that block; falls back to current stake.
+    """
+    try:
+        for entry in reversed(bc.access_logs or []):
+            if entry.get("action") == "REWARD_DISTRIBUTED" and str(entry.get("record_id")) == str(block_index):
+                stakes = entry.get("stakes") or {}
+                if producer_id in stakes:
+                    return float(stakes.get(producer_id, 0))
+                break
+    except Exception:
+        pass
+    try:
+        return float(bc.get_stake(producer_id))
+    except Exception:
+        return 0.0
+
+
 def app_header():
     # Hardcoded theme values for dark mode
     accent, font, radius, scale, dark = "#00E676", "Share Tech Mono (Digital)", 10, 100, True
@@ -762,8 +781,8 @@ def chain_page():
         if isinstance(getattr(blk, "consensus_data", None), dict):
             mode = blk.consensus_data.get("mode", "-")
             producer = blk.consensus_data.get("producer", "-")
-        # Producer stake (if any)
-        p_stake = bc.get_stake(producer) if producer and producer != "-" else 0
+        # Producer stake at the time of this block (historical snapshot)
+        p_stake = _stake_at_block(bc, blk.index, producer) if producer and producer != "-" else 0
         # Derive action and reason from transactions
         action = "No transactions"
         reason = "-"

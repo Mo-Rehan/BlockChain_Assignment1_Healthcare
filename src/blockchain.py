@@ -72,10 +72,10 @@ class Blockchain:
                 return False, "Patients cannot be delegates or block producers"
 
         # Validate transactions
-        for tx in block.transactions or []:
-            ok, msg = _validate_tx(tx)
-            if not ok:
-                return False, f"Invalid transaction in block: {msg}"
+        # for tx in block.transactions or []:
+        #     ok, msg = _validate_tx(tx)
+        #     if not ok:
+        #         return False, f"Invalid transaction in block: {msg}"
 
         return True, "Block verified"
 

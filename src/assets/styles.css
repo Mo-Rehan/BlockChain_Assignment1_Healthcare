@@ -114,6 +114,9 @@ body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100
 [data-testid="stJson"] { background: var(--node-bg) !important; border: 1px solid var(--card-border) !important; border-radius: var(--radius) !important; padding: 12px !important; }
 [data-testid="stJson"] pre { background: transparent !important; color: var(--card-fg) !important; font-family: 'Share Tech Mono', monospace !important; white-space: pre-wrap !important; }
 [data-testid="stJson"] span { color: var(--card-fg) !important; }
+.stCode, .stCode pre, .stCode code { background: var(--node-bg) !important; color: var(--card-fg) !important; border-radius: var(--radius) !important; }
+[data-testid="stCodeBlock"] pre { background: var(--node-bg) !important; color: var(--card-fg) !important; border: 1px solid var(--card-border) !important; padding: 12px !important; }
+[data-testid="stCodeBlock"] code, [data-testid="stCodeBlock"] span, [data-testid="stCodeBlock"] * { color: var(--card-fg) !important; }
 .stExpander { border: 1px solid var(--card-border) !important; border-radius: var(--radius) !important; }
 .stExpander > div { background: var(--card-bg) !important; }
 .stExpander summary { color: var(--card-fg) !important; }

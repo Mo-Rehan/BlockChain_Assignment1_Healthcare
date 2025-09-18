@@ -91,7 +91,9 @@ def app_header():
         [data-testid="stSidebar"] label { color: var(--card-fg) !important; }
         [data-testid="stSidebar"] .stRadio > div { background: var(--node-bg); }
         [data-testid="stSidebar"] .stRadio > div > label { color: var(--card-fg) !important; }
-        [data-testid="stSidebar"] .stRadio > div > label > div { color: var(--card-fg) !important; }
+        [data-testid="stSidebar"] .stRadio > div > label > div { color: #000000 !important; }
+        [data-testid="stSidebar"] .stRadio > div > label { color: #000000 !important; }
+        [data-testid="stSidebar"] .stRadio > div { background: #ffffff !important; }
         .block-container { background: transparent !important; }
         /* Make general text readable on dark */
         .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }

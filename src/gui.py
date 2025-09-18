@@ -118,6 +118,8 @@ def dashboard():
             if isinstance(getattr(blk, "consensus_data", None), dict):
                 mode = blk.consensus_data.get("mode", "-")
                 producer = blk.consensus_data.get("producer", "-")
+            # Producer stake (if any)
+            p_stake = bc.get_stake(producer) if producer and producer != "-" else 0
             # Derive action and reason from transactions
             action = "No transactions"
             reason = "-"
@@ -162,7 +164,7 @@ def dashboard():
                 <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
                 <div class='kv'>hash: {fmt(bhash)}</div>
                 <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
-                <div class='kv'>mode: {mode} | delegate: {producer}</div>
+                <div class='kv'>mode: {mode} | delegate: {producer} (stake={p_stake})</div>
                 <div class='kv'>action: {action}</div>
                 <div class='kv'>reason: {reason}</div>
                 {f"<div class='kv'>consent pairs: {', '.join(consent_pairs_pd)}</div>" if consent_pairs_pd else ""}
@@ -244,10 +246,17 @@ def users_page():
             with cols[i]:
                 st.markdown(f"### {labels[role]}")
                 entries = bc.users[role]
-                if entries:
-                    st.table([{k: v for k, v in u.items() if k != "consent"} for u in entries])
+                if role == "patients":
+                    # Hide consent list from table, but show stake
+                    rows = [{"id": x.get("id"), "name": x.get("name"), "stake": bc.get_stake(x.get("id"))} for x in entries]
+                elif role == "doctors":
+                    rows = [{"id": x.get("id"), "name": x.get("name"), "stake": bc.get_stake(x.get("id"))} for x in entries]
                 else:
-                    st.info(f"No {labels[role].lower()} registered")
+                    rows = [{"id": x.get("id"), "name": x.get("name")} for x in entries]
+                if rows:
+                    st.table(rows)
+                else:
+                    st.caption("No entries")
 
     with t2:
         patients = [p["id"] for p in bc.users["patients"]]
@@ -332,8 +341,30 @@ def consensus_page():
             except Exception:
                 pass
 
+    st.markdown("---")
+    st.caption("Auto-select top-N delegates by stake (doctors only)")
+    c1, c2 = st.columns([1,1])
+    with c1:
+        top_n = st.number_input("Number of delegates", min_value=1, value=max(1, len(bc.delegates) or 1), step=1)
+    with c2:
+        if st.button("Auto-Select Delegates by Stake"):
+            # Rank doctors by stake (desc) and pick top N distinct IDs
+            doctor_rows = bc.users.get("doctors", [])
+            ranked = sorted(((d.get("id"), bc.get_stake(d.get("id"))) for d in doctor_rows), key=lambda x: x[1], reverse=True)
+            new_delegates = [uid for uid, stake in ranked if stake > 0][: int(top_n)]
+            before = list(bc.delegates)
+            bc.delegates = new_delegates
+            bc.save_state()
+            st.success(f"Delegates set to: {', '.join(new_delegates) if new_delegates else '(none)'}")
+            try:
+                bc.log_access("system", "DELEGATES_AUTOSELECT", "-", True, before=before, after=new_delegates, top_n=int(top_n))
+            except Exception:
+                pass
+
     if bc.delegates:
-        st.write("Delegates:", ", ".join(bc.delegates))
+        # Show delegates with their stakes
+        label_list = [f"{d} (stake={bc.get_stake(d)})" for d in bc.delegates]
+        st.write("Delegates:", ", ".join(label_list))
         to_remove = st.multiselect("Remove delegates", bc.delegates)
         if st.button("Remove Selected") and to_remove:
             bc.delegates = [d for d in bc.delegates if d not in to_remove]
@@ -556,6 +587,8 @@ def chain_page():
         if isinstance(getattr(blk, "consensus_data", None), dict):
             mode = blk.consensus_data.get("mode", "-")
             producer = blk.consensus_data.get("producer", "-")
+        # Producer stake (if any)
+        p_stake = bc.get_stake(producer) if producer and producer != "-" else 0
         # Derive action and reason from transactions
         action = "No transactions"
         reason = "-"
@@ -604,7 +637,7 @@ def chain_page():
             <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
             <div class='kv'>hash: {fmt(bhash)}</div>
             <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
-            <div class='kv'>mode: {mode} | delegate: {producer}</div>
+            <div class='kv'>mode: {mode} | delegate: {producer} (stake={p_stake})</div>
             <div class='kv'>action: {action}</div>
             <div class='kv'>reason: {reason}</div>
             <div class='kv'>consent: {consent}</div>
@@ -681,6 +714,30 @@ def admin_page():
     # Tab 2: Staking (Admin assigns stake to doctor/patient)
     with t2:
         st.caption("Assign stake to a doctor or patient. Stake is a numeric weight used by DPoS.")
+        # Cap controls
+        cap_col1, cap_col2 = st.columns([1,1])
+        with cap_col1:
+            current_cap = bc.stake_cap if bc.stake_cap is not None else "(no cap)"
+            st.write(f"Current stake cap: {current_cap}")
+            cap_in = st.text_input("Set stake cap (blank to disable)", value=str(bc.stake_cap) if bc.stake_cap is not None else "")
+        with cap_col2:
+            if st.button("Apply Cap"):
+                if cap_in.strip() == "":
+                    ok, msg = bc.set_stake_cap(None)
+                else:
+                    ok, msg = bc.set_stake_cap(cap_in)
+                if ok:
+                    bc.save_state(); st.success(msg)
+                    try:
+                        bc.log_access("admin", "STAKE_CAP_SET", "-", True, cap=bc.stake_cap)
+                    except Exception:
+                        pass
+                else:
+                    st.error(msg)
+                    try:
+                        bc.log_access("admin", "STAKE_CAP_SET", "-", False, reason=msg)
+                    except Exception:
+                        pass
         # Build selectable list of all non-admin users
         all_users = (
             [(d["id"], f"Doctor: {d['id']} - {d['name']}") for d in bc.users.get("doctors", [])]

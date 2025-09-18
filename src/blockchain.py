@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import random
 import time
 import secrets
 import os
@@ -30,6 +31,8 @@ class Blockchain:
         self.delegates = []
         # Stakes for users (doctor/patient). Map user_id -> numeric stake
         self.stakes: dict[str, float] = {}
+        # Configurable maximum allowed stake per user (None or number)
+        self.stake_cap: float | None = None
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -118,25 +121,20 @@ class Blockchain:
 
         # DPoS is the only supported consensus mechanism for this assignment
         mode = self.consensus_mode
-        producer = None
         consensus_meta = {"mode": mode}
-
+        producer = None
         if mode == "DPoS":
-            if not self.delegates:
-                print("No delegates registered for DPoS. Elect delegates first.")
-                return None
-            # Round-robin delegate selection for block production
-            delegate_index = (len(self.chain)) % len(self.delegates)
-            producer = self.delegates[delegate_index]
-            consensus_meta.update({
-                "producer": producer,
-                "delegate_index": delegate_index,
-                "delegate_list": self.delegates.copy()
-            })
-            # Enforce: patient cannot be a delegate/producer
-            if self.is_patient(producer):
-                print("Selected producer is a patient. Patients cannot be delegates or producers.")
-                return None
+            # Stake-weighted random choice among delegates (doctors only)
+            candidates = [d for d in self.delegates if self.find_user(d) and not self.is_patient(d)]
+            if candidates:
+                weights = [max(self.get_stake(d), 0.0001) for d in candidates]
+                try:
+                    producer = random.choices(candidates, weights=weights, k=1)[0]
+                except Exception:
+                    producer = candidates[0]
+                consensus_meta["weights"] = {d: self.get_stake(d) for d in candidates}
+            else:
+                producer = None
         else:
             print("Only DPoS consensus is supported in this healthcare blockchain.")
             print("Please configure DPoS consensus first.")
@@ -149,7 +147,7 @@ class Blockchain:
 
         prev_hash = self.chain[-1].hash()
         block = Block(len(self.chain), transactions, prev_hash, self.users["doctors"])
-        block.consensus_data = consensus_meta
+        block.consensus_data = {"producer": producer, "mode": mode, **consensus_meta}
         block.nonce = secrets.randbelow(1 << 30)
 
         # Verify block before appending
@@ -241,6 +239,7 @@ class Blockchain:
             "consensus_mode": self.consensus_mode,
             "delegates": self.delegates,
             "stakes": self.stakes,
+            "stake_cap": self.stake_cap,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -266,6 +265,7 @@ class Blockchain:
             print(f"Removed invalid patient delegates from state: {sorted(list(removed))}")
         # Load stakes
         self.stakes = data.get("stakes", {})
+        self.stake_cap = data.get("stake_cap")
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -293,6 +293,8 @@ class Blockchain:
             return False, "Stake must be a number"
         if amt < 0:
             return False, "Stake cannot be negative"
+        if self.stake_cap is not None and amt > float(self.stake_cap):
+            return False, f"Stake exceeds cap ({self.stake_cap})"
         if not self.find_user(user_id):
             return False, "User not found"
         self.stakes[user_id] = amt
@@ -303,6 +305,19 @@ class Blockchain:
             return float(self.stakes.get(user_id, 0))
         except Exception:
             return 0.0
+
+    def set_stake_cap(self, cap: float | None) -> tuple[bool, str]:
+        if cap is None:
+            self.stake_cap = None
+            return True, "Stake cap disabled"
+        try:
+            value = float(cap)
+        except Exception:
+            return False, "Cap must be a number"
+        if value < 0:
+            return False, "Cap cannot be negative"
+        self.stake_cap = value
+        return True, "Stake cap set"
 
     def validate_chain(self) -> bool:
         if not self.chain:

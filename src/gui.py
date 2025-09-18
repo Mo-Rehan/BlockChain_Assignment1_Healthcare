@@ -117,6 +117,28 @@ def dashboard():
             if isinstance(getattr(blk, "consensus_data", None), dict):
                 mode = blk.consensus_data.get("mode", "-")
                 producer = blk.consensus_data.get("producer", "-")
+            # Derive action and reason from transactions
+            action = "No transactions"
+            reason = "-"
+            txs = blk.transactions or []
+            if txs:
+                if len(txs) == 1:
+                    t = txs[0]
+                    op = t.get("operation", "?")
+                    rid = t.get("record_id", "?")
+                    action = f"{op} {rid}"
+                    reason_map = {
+                        "Add": "New record added",
+                        "Update": "Record updated",
+                        "Share": "Record shared",
+                        "Emergency_Add": "Emergency record added",
+                        "Delete": "Record deleted",
+                    }
+                    reason = reason_map.get(op, "Transaction included")
+                else:
+                    unique_ops = sorted({t.get("operation", "?") for t in txs})
+                    action = f"{len(txs)} transactions"
+                    reason = ", ".join(unique_ops)
             node = f"""
             <div class='chain-node'>
                 <h4>BLOCK {blk.index}</h4>
@@ -125,6 +147,8 @@ def dashboard():
                 <div class='kv'>hash: {fmt(bhash)}</div>
                 <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
                 <div class='kv'>mode: {mode} | delegate: {producer}</div>
+                <div class='kv'>action: {action}</div>
+                <div class='kv'>reason: {reason}</div>
             </div>
             """
             html.append(node)
@@ -399,7 +423,28 @@ def chain_page():
         if isinstance(getattr(blk, "consensus_data", None), dict):
             mode = blk.consensus_data.get("mode", "-")
             producer = blk.consensus_data.get("producer", "-")
-
+        # Derive action and reason from transactions
+        action = "No transactions"
+        reason = "-"
+        txs = blk.transactions or []
+        if txs:
+            if len(txs) == 1:
+                t = txs[0]
+                op = t.get("operation", "?")
+                rid = t.get("record_id", "?")
+                action = f"{op} {rid}"
+                reason_map = {
+                    "Add": "New record added",
+                    "Update": "Record updated",
+                    "Share": "Record shared",
+                    "Emergency_Add": "Emergency record added",
+                    "Delete": "Record deleted",
+                }
+                reason = reason_map.get(op, "Transaction included")
+            else:
+                unique_ops = sorted({t.get("operation", "?") for t in txs})
+                action = f"{len(txs)} transactions"
+                reason = ", ".join(unique_ops)
         node = f"""
         <div class='chain-node'>
             <h4>BLOCK {blk.index}</h4>
@@ -408,6 +453,8 @@ def chain_page():
             <div class='kv'>hash: {fmt(bhash)}</div>
             <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
             <div class='kv'>mode: {mode} | delegate: {producer}</div>
+            <div class='kv'>action: {action}</div>
+            <div class='kv'>reason: {reason}</div>
         </div>
         """
         html.append(node)

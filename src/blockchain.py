@@ -33,6 +33,8 @@ class Blockchain:
         self.stakes: dict[str, float] = {}
         # Configurable maximum allowed stake per user (None or number)
         self.stake_cap: float | None = None
+        # Patient voting: map patient_id -> doctor_id (their current vote)
+        self.votes: dict[str, str] = {}
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -240,6 +242,7 @@ class Blockchain:
             "delegates": self.delegates,
             "stakes": self.stakes,
             "stake_cap": self.stake_cap,
+            "votes": self.votes,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -266,6 +269,8 @@ class Blockchain:
         # Load stakes (cap is deprecated/ignored)
         self.stakes = data.get("stakes", {})
         self.stake_cap = None
+        # Load votes
+        self.votes = data.get("votes", {})
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -311,23 +316,51 @@ class Blockchain:
         return True, "Stake cap feature removed; cap disabled"
 
     def enforce_stake_cap(self):
-        """Clamp any existing stakes to the current stake_cap. Returns list of user_ids adjusted."""
-        adjusted = []
-        try:
-            if self.stake_cap is None:
-                return adjusted
-            cap_val = float(self.stake_cap)
-            for uid, amt in list(self.stakes.items()):
-                try:
-                    f = float(amt)
-                except Exception:
-                    f = 0.0
-                if f > cap_val:
-                    self.stakes[uid] = cap_val
-                    adjusted.append(uid)
-        except Exception:
-            pass
-        return adjusted
+        """Stake cap feature removed. This is a no-op kept for backward compatibility."""
+        return []
+
+    # --- Voting (patients vote for doctor delegates, weighted by patient stake) ---
+    def set_vote(self, patient_id: str, doctor_id: str) -> tuple[bool, str]:
+        if not self.find_user(patient_id) or not self.is_patient(patient_id):
+            return False, "Patient not found"
+        if not self.find_user(doctor_id) or not self.is_doctor(doctor_id):
+            return False, "Doctor not found"
+        self.votes[patient_id] = doctor_id
+        return True, "Vote recorded"
+
+    def tally_votes(self) -> dict:
+        """Return a dict: doctor_id -> { 'weight': sum_stake, 'count': num_votes }"""
+        tally: dict[str, dict] = {}
+        for pid, did in self.votes.items():
+            if not self.is_doctor(did):
+                continue
+            # weight = patient stake
+            w = self.get_stake(pid)
+            if did not in tally:
+                tally[did] = {"weight": 0.0, "count": 0}
+            tally[did]["weight"] += float(w)
+            tally[did]["count"] += 1
+        return tally
+
+    def select_delegates_from_votes(self, top_n: int, prefer_existing: bool = True) -> list[str]:
+        """Select top-N doctor delegates based on patient-weighted votes.
+        Tie-breaker: prefer existing delegates if prefer_existing, then by doctor_id ascending.
+        Updates self.delegates and returns the new list.
+        """
+        tally = self.tally_votes()
+        # Build list of (doctor_id, weight, count)
+        candidates = [(did, meta.get("weight", 0.0), meta.get("count", 0)) for did, meta in tally.items() if self.is_doctor(did)]
+        old = list(self.delegates)
+        def sort_key(item):
+            did, weight, cnt = item
+            pref = 0
+            if prefer_existing and did in old:
+                pref = -1  # existing delegates get priority in ties
+            return (-weight, pref, did)
+        ranked = sorted(candidates, key=sort_key)
+        new_delegates = [did for did, _, _ in ranked[: max(0, int(top_n))]]
+        self.delegates = new_delegates
+        return new_delegates
 
     def validate_chain(self) -> bool:
         if not self.chain:

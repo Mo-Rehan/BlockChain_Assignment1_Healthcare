@@ -381,6 +381,67 @@ def consensus_page():
         except Exception:
             pass
 
+    st.markdown("---")
+    st.subheader("Voting (Patients vote for Doctor Delegates)")
+    # Voting form: patient chooses a doctor to vote for. Vote weight = patient stake.
+    pat_ids = [p.get("id") for p in bc.users.get("patients", [])]
+    doc_ids = [d.get("id") for d in bc.users.get("doctors", [])]
+    if not pat_ids or not doc_ids:
+        st.info("Register at least one patient and one doctor to enable voting.")
+    else:
+        c1, c2, c3 = st.columns([1,1,1])
+        with c1:
+            v_pid = st.selectbox("Patient (voter)", pat_ids, key="vote_pid")
+            st.caption(f"Stake weight: {bc.get_stake(v_pid)}")
+        with c2:
+            v_did = st.selectbox("Doctor (candidate)", doc_ids, key="vote_did")
+        with c3:
+            if st.button("Cast Vote"):
+                ok, msg = bc.set_vote(v_pid, v_did)
+                if ok:
+                    bc.save_state(); st.success("Vote recorded")
+                    try:
+                        bc.log_access(v_pid, "VOTE_CAST", v_did, True, weight=bc.get_stake(v_pid))
+                    except Exception:
+                        pass
+                else:
+                    st.error(msg)
+                    try:
+                        bc.log_access(v_pid, "VOTE_CAST", v_did, False, reason=msg)
+                    except Exception:
+                        pass
+
+    # Show weighted tally
+    tally = bc.tally_votes() if hasattr(bc, "tally_votes") else {}
+    if tally:
+        rows = []
+        for did, meta in tally.items():
+            rows.append({
+                "doctor": did,
+                "weight": round(float(meta.get("weight", 0.0)), 4),
+                "votes": int(meta.get("count", 0)),
+                "stake": bc.get_stake(did),
+                "is_current_delegate": did in bc.delegates,
+            })
+        st.table(sorted(rows, key=lambda r: (-r["weight"], r["doctor"])) )
+    else:
+        st.caption("No votes yet.")
+
+    # Select delegates from votes with tie-breaker
+    c1, c2 = st.columns([1,1])
+    with c1:
+        top_n_votes = st.number_input("Delegates to select from votes", min_value=1, value=max(1, len(bc.delegates) or 1), step=1)
+    with c2:
+        if st.button("Select Delegates from Votes"):
+            new_delegates = bc.select_delegates_from_votes(int(top_n_votes), prefer_existing=True)
+            before = list(set(bc.delegates) - set(new_delegates))  # for log context
+            bc.save_state()
+            st.success(f"Delegates from votes: {', '.join(new_delegates) if new_delegates else '(none)'}")
+            try:
+                bc.log_access("system", "DELEGATES_FROM_VOTES", "-", True, selected=new_delegates, top_n=int(top_n_votes))
+            except Exception:
+                pass
+
 
 def records_page():
     bc = st.session_state.bc

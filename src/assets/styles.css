@@ -1,0 +1,80 @@
+/* Global typography and layout */
+html, body, [class*="css"] { font-family: var(--font) !important; font-size: calc(16px * var(--scale)/100); }
+.app-header { background: var(--header-bg); border: 1px solid var(--card-border); color: var(--text-main); padding:18px; border-radius:12px; margin-bottom:16px; text-shadow: 0 0 6px rgba(0,230,118,.5); letter-spacing:.5px; }
+.card { background: var(--card-bg); color: var(--card-fg); padding:16px; border-radius:var(--radius); box-shadow:0 2px 8px rgba(0,0,0,.08); border:1px solid var(--card-border); }
+.block-card { background: var(--card-bg); color: var(--card-fg); padding:14px; border-radius:var(--radius); box-shadow:0 1px 6px rgba(0,0,0,.3); margin-bottom:10px; border:1px solid var(--card-border) }
+body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+.stApp { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+
+/* Force dark background across app containers */
+[data-testid="stAppViewContainer"] { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
+[data-testid="stHeader"], [data-testid="stToolbar"] { background: transparent !important; }
+[data-testid="stSidebar"] { background: var(--node-bg) !important; border-right: 1px solid var(--card-border); }
+/* Sidebar navigation text color */
+[data-testid="stSidebar"] label { color: var(--card-fg) !important; }
+[data-testid="stSidebar"] .stRadio > div { background: var(--node-bg); }
+[data-testid="stSidebar"] .stRadio > div > label { color: var(--card-fg) !important; }
+
+.block-container { background: transparent !important; }
+/* Make general text readable on dark */
+.block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }
+[data-testid="stMarkdownContainer"] * { color: var(--card-fg) !important; }
+.stExpander, .stExpander p, .stExpander div, .stExpander span { color: var(--card-fg) !important; }
+/* Ensure explorer page text is visible */
+.stMarkdown p, .stMarkdown pre, .stMarkdown code, .stMarkdown div { color: var(--card-fg) !important; }
+.stMarkdown pre { background-color: var(--node-bg) !important; border: 1px solid var(--card-border) !important; }
+/* Force text color for all direct children in explorer */
+.stMarkdown > * { color: var(--card-fg) !important; }
+/* Specific fix for index and nonce values */
+.stMarkdown code { color: var(--text-main) !important; font-weight: bold; }
+
+/* Buttons */
+.stDownloadButton > button { background: var(--accent) !important; color: var(--btn-text) !important; border: none !important; border-radius: var(--radius) !important; padding: 0.5rem 1rem !important; font-weight: 700 !important; letter-spacing: .02em; }
+.stDownloadButton > button:hover { filter: brightness(0.95) !important; }
+/* Primary buttons */
+.stButton > button { background: var(--accent) !important; color: var(--btn-text) !important; border: 1px solid var(--accent) !important; border-radius: var(--radius) !important; padding: .55rem 1.05rem !important; font-weight: 700 !important; letter-spacing: .02em; box-shadow: 0 2px 10px rgba(0,230,118,.18) !important; }
+.stButton > button:hover { filter: brightness(0.95) !important; box-shadow: 0 4px 16px rgba(0,230,118,.28) !important; }
+.stButton > button:active { transform: translateY(1px); box-shadow: 0 1px 6px rgba(0,230,118,.22) !important; }
+.stButton > button:focus-visible { outline: 2px solid rgba(0,230,118,.6) !important; outline-offset: 2px !important; }
+.stButton > button:disabled { opacity: .6 !important; cursor: not-allowed !important; filter: none !important; box-shadow: none !important; }
+/* Form submit buttons */
+.stForm .stFormSubmitButton > button { background: var(--accent) !important; color: var(--btn-text) !important; border: 1px solid var(--accent) !important; border-radius: var(--radius) !important; padding: .55rem 1.05rem !important; font-weight: 700 !important; letter-spacing: .02em; box-shadow: 0 2px 10px rgba(0,230,118,.18) !important; }
+.stForm .stFormSubmitButton > button:hover { filter: brightness(0.95) !important; box-shadow: 0 4px 16px rgba(0,230,118,.28) !important; }
+.stForm .stFormSubmitButton > button:active { transform: translateY(1px); box-shadow: 0 1px 6px rgba(0,230,118,.22) !important; }
+.stForm .stFormSubmitButton > button:focus-visible { outline: 2px solid rgba(0,230,118,.6) !important; outline-offset: 2px !important; }
+.stForm .stFormSubmitButton > button:disabled { opacity: .6 !important; cursor: not-allowed !important; filter: none !important; box-shadow: none !important; }
+
+/* Inputs and selects */
+.stTextInput>div>div>input, .stTextArea textarea { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
+.stTextInput label, .stTextArea label, .stSelectbox label, label { color: var(--card-fg) !important; }
+.stTextInput input::placeholder, .stTextArea textarea::placeholder { color: rgba(215,255,230,.6) !important; }
+.stSelectbox>div>div { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
+
+/* Selectbox control area and popover menu for perfect contrast */
+/* Closed control (selected value) */
+.stSelectbox [data-baseweb="select"] { color: #fff !important; }
+.stSelectbox [data-baseweb="select"] * { color: #fff !important; }
+.stSelectbox [data-baseweb="select"] [role="combobox"],
+.stSelectbox [data-baseweb="select"] input,
+.stSelectbox [data-baseweb="select"] span { color: #fff !important; }
+.stSelectbox > div > div { background: #000 !important; color: #fff !important; border: 1px solid var(--card-border) !important; }
+.stSelectbox [data-baseweb="select"] svg { fill: #fff !important; }
+/* Opened list (popover) */
+[data-baseweb="popover"] [data-baseweb="menu"] { background: #ffffff !important; }
+[data-baseweb="popover"] [data-baseweb="menu"] * { color: #000000 !important; }
+[data-baseweb="popover"] [data-baseweb="menu"] [role="option"] { color: #000000 !important; }
+[data-baseweb="popover"] [data-baseweb="menu"] [aria-selected="true"],
+[data-baseweb="popover"] [data-baseweb="menu"] [role="option"][data-selected="true"] { color: #000000 !important; background: #e9efff !important; }
+
+/* Tabs, metrics, and decorative text */
+[data-baseweb="tabs"] { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--card-border); }
+.stMetric>div>div { font-size: 0.95rem; }
+.stMetric>div>div>span { font-family: 'Share Tech Mono', monospace !important; letter-spacing: .06em; }
+.seven { font-family: 'Share Tech Mono', monospace; letter-spacing: .08em; text-shadow: 0 0 6px rgba(0,230,118,.4); }
+
+/* Digital chain visuals */
+.chain-wrap { display:flex; gap:20px; align-items:center; overflow-x:auto; padding: 10px 2px; }
+.chain-node { min-width: 260px; background: var(--node-bg); color: var(--text-main); border:1px solid var(--card-border); border-radius:var(--radius); padding:12px; box-shadow:0 2px 8px rgba(0,0,0,.5); }
+.chain-node h4 { margin: 0 0 8px 0; font-weight:700; letter-spacing:.12em; text-shadow: 0 0 5px rgba(0,230,118,.6); }
+.chain-node .kv { font-family: 'Share Tech Mono', monospace; font-size: .9rem; }
+.connector { height: 2px; width: 60px; background: linear-gradient(90deg, #0f1b2d, var(--accent)); box-shadow: 0 0 6px rgba(0,230,118,.6); border-radius: 2px; }

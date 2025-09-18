@@ -673,6 +673,15 @@ def chain_page():
 def admin_page():
     bc = st.session_state.bc
     st.subheader("Admin")
+    # If no blocks exist yet, allow creating the genesis block here
+    if not bc.chain:
+        st.info("No blocks found. Create a genesis block to initialize the chain.")
+        if st.button("Create Genesis Block"):
+            bc.create_genesis(); bc.save_state(); st.success("Genesis created")
+            try:
+                bc.log_access("system", "GENESIS_CREATE", "-", True)
+            except Exception:
+                pass
     t1, t2 = st.tabs(["Register User", "Staking"])
 
     # Tab 1: Register User (Admin can register doctors/patients/admins)

@@ -252,16 +252,13 @@ class Blockchain:
             if producer:
                 self.stakes[producer] = float(self.get_stake(producer)) + prod_share
             if supporters_count > 0 and supporters_share > 0:
-                weights = {pid: float(self.get_stake(pid)) for pid in supporters}
-                total_weight = sum(weights.values())
-                if total_weight > 0:
-                    for pid, w in weights.items():
-                        amt = supporters_share * (w / total_weight)
-                        if amt <= 0:
-                            continue
-                        new_stake = float(self.get_stake(pid)) + amt
+                # Equal split among all supporters (not weighted by stake)
+                amt_each = supporters_share / supporters_count
+                if amt_each > 0:
+                    for pid in supporters:
+                        new_stake = float(self.get_stake(pid)) + amt_each
                         self.stakes[pid] = new_stake
-                        breakdown[pid] = round(amt, 6)
+                        breakdown[pid] = round(amt_each, 6)
                         # Per-patient log line in requested format
                         try:
                             self.log_access(
@@ -269,20 +266,16 @@ class Blockchain:
                                 action="REWARD_DISTRIBUTED",
                                 record_id=str(block.index),
                                 success=True,
-                                message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {pid} reward = {round(amt,6)}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
+                                message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {pid} reward = {round(amt_each,6)}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
                                 producer=producer,
                                 patient=pid,
                                 doctor_reward=round(prod_share, 6),
-                                patient_reward=round(amt, 6),
+                                patient_reward=round(amt_each, 6),
                                 doctor_stake=round(float(self.get_stake(producer)), 6),
                                 patient_stake=round(new_stake, 6),
                             )
                         except Exception:
                             pass
-                else:
-                    # No supporter weight; give all supporters' share to producer
-                    if producer and supporters_share > 0:
-                        self.stakes[producer] = float(self.get_stake(producer)) + supporters_share
             else:
                 # no supporters: add entire supporters' share to producer stake
                 if producer and supporters_share > 0:

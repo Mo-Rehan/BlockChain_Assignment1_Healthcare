@@ -44,6 +44,17 @@ class Blockchain:
         self.share_ratio: float = 0.30    # fraction shared to supporters
         # Account balances (for doctors/patients/admins)
         self.balances: dict[str, float] = {}
+        
+        # Initialize stakes for all users
+        self._init_stakes()
+        
+    def _init_stakes(self):
+        """Ensure all users have a stake entry (default 0.0)"""
+        for role in ("doctors", "patients", "admins"):
+            for user in self.users.get(role, []):
+                user_id = user.get("id")
+                if user_id and user_id not in self.stakes:
+                    self.stakes[user_id] = 0.0
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -122,14 +133,37 @@ class Blockchain:
 
     def add_block_with_consensus(self, transactions):
         if not self.chain:
-            print("Create genesis first.")
+            print("Create genesis block first")
             return None
-        if not self.consensus_mode:
-            print("Set consensus mode first in 'Configure Consensus' menu.")
-            return None
-        if not transactions:
-            print("Creating empty block (no transactions).")
 
+        # If DPoS, ensure the block is from the expected producer
+        if self.consensus_mode == "DPoS":
+            if not hasattr(self, 'delegates') or not self.delegates:
+                print("Block rejected: No delegates selected. Use 'Select Delegates from Votes' first.")
+                return None
+                
+            # Check if producer is in current delegates
+            producer = None
+            for tx in transactions:
+                if tx.get("doctor_id"):
+                    producer = tx["doctor_id"]
+                    break
+                    
+            if not producer:
+                print("Block rejected: No producer found in transactions")
+                return None
+                
+            # Get expected producer and winners list
+            exp_prod, winners = self.current_expected_producer()
+            
+            if not winners:
+                print("Block rejected: No winners available to produce blocks")
+                return None
+                
+            if producer != exp_prod:
+                print(f"Block rejected: Expected producer {exp_prod}, got {producer}")
+                return None
+                
         # DPoS is the only supported consensus mechanism for this assignment
         mode = self.consensus_mode
         consensus_meta = {"mode": mode}
@@ -268,6 +302,9 @@ class Blockchain:
                 pass
         except Exception as e:
             print("Reward distribution failed:", e)
+        finally:
+            # Always save state after block addition and reward distribution
+            self.save_state()
 
         return block
 

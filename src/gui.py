@@ -714,58 +714,6 @@ def admin_page():
     # Tab 2: Staking (Admin assigns stake to doctor/patient)
     with t2:
         st.caption("Assign stake to a doctor or patient. Stake is a numeric weight used by DPoS.")
-        # Cap controls
-        cap_col1, cap_col2 = st.columns([1,1])
-        with cap_col1:
-            cap_val = getattr(bc, "stake_cap", None)
-            current_cap = cap_val if cap_val is not None else "(no cap)"
-            st.write(f"Current stake cap: {current_cap}")
-            cap_in = st.text_input("Set stake cap (blank to disable)", value=str(cap_val) if cap_val is not None else "")
-        with cap_col2:
-            if st.button("Apply Cap"):
-                # Support older session objects that may not have set_stake_cap
-                def _apply_cap(v):
-                    if hasattr(bc, "set_stake_cap"):
-                        return bc.set_stake_cap(v)
-                    # Fallback validation if method missing
-                    if v is None:
-                        setattr(bc, "stake_cap", None)
-                        return True, "Stake cap disabled"
-                    try:
-                        value = float(v)
-                    except Exception:
-                        return False, "Cap must be a number"
-                    if value < 0:
-                        return False, "Cap cannot be negative"
-                    setattr(bc, "stake_cap", value)
-                    # Try to clamp existing stakes
-                    adjusted = []
-                    if hasattr(bc, "enforce_stake_cap"):
-                        try:
-                            adjusted = bc.enforce_stake_cap()
-                        except Exception:
-                            adjusted = []
-                    msg = "Stake cap set"
-                    if adjusted:
-                        msg += f"; clamped {len(adjusted)} stake(s) to {value}"
-                    return True, msg
-
-                if cap_in.strip() == "":
-                    ok, msg = _apply_cap(None)
-                else:
-                    ok, msg = _apply_cap(cap_in)
-                if ok:
-                    bc.save_state(); st.success(msg)
-                    try:
-                        bc.log_access("admin", "STAKE_CAP_SET", "-", True, cap=getattr(bc, "stake_cap", None))
-                    except Exception:
-                        pass
-                else:
-                    st.error(msg)
-                    try:
-                        bc.log_access("admin", "STAKE_CAP_SET", "-", False, reason=msg)
-                    except Exception:
-                        pass
         # Build selectable list of all non-admin users
         all_users = (
             [(d["id"], f"Doctor: {d['id']} - {d['name']}") for d in bc.users.get("doctors", [])]

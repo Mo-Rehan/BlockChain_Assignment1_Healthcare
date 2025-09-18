@@ -263,11 +263,9 @@ class Blockchain:
         self.delegates = filtered
         if removed:
             print(f"Removed invalid patient delegates from state: {sorted(list(removed))}")
-        # Load stakes
+        # Load stakes (cap is deprecated/ignored)
         self.stakes = data.get("stakes", {})
-        self.stake_cap = data.get("stake_cap")
-        # Enforce cap on loaded stakes if needed
-        self.enforce_stake_cap()
+        self.stake_cap = None
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -295,8 +293,7 @@ class Blockchain:
             return False, "Stake must be a number"
         if amt < 0:
             return False, "Stake cannot be negative"
-        if self.stake_cap is not None and amt > float(self.stake_cap):
-            return False, f"Stake exceeds cap ({self.stake_cap})"
+        # Cap removed: no upper-bound enforcement
         if not self.find_user(user_id):
             return False, "User not found"
         self.stakes[user_id] = amt
@@ -309,22 +306,9 @@ class Blockchain:
             return 0.0
 
     def set_stake_cap(self, cap: float | None) -> tuple[bool, str]:
-        if cap is None:
-            self.stake_cap = None
-            return True, "Stake cap disabled"
-        try:
-            value = float(cap)
-        except Exception:
-            return False, "Cap must be a number"
-        if value < 0:
-            return False, "Cap cannot be negative"
-        self.stake_cap = value
-        # Clamp existing stakes above the cap
-        adjusted = self.enforce_stake_cap()
-        msg = "Stake cap set"
-        if adjusted:
-            msg += f"; clamped {len(adjusted)} stake(s) to {value}"
-        return True, msg
+        # Feature removed: always disable cap and keep None
+        self.stake_cap = None
+        return True, "Stake cap feature removed; cap disabled"
 
     def enforce_stake_cap(self):
         """Clamp any existing stakes to the current stake_cap. Returns list of user_ids adjusted."""

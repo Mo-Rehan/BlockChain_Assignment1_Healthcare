@@ -213,6 +213,11 @@ def users_page():
                 else:
                     bc.users["admins"].append({"id": uid, "name": name})
                 bc.save_state()
+                # Log registration
+                try:
+                    st.session_state.bc.log_access(uid, "REGISTER_USER", uid, True)
+                except Exception:
+                    pass
                 st.success("User registered")
 
         st.markdown("---")
@@ -242,16 +247,34 @@ def users_page():
                     patient = next((p for p in bc.users["patients"] if p["id"] == pid), None)
                     if did not in patient["consent"]:
                         patient["consent"].append(did)
-                        bc.save_state(); st.success("Consent added")
+                        bc.save_state();
+                        try:
+                            bc.log_access(pid, "CONSENT_GIVE", did, True)
+                        except Exception:
+                            pass
+                        st.success("Consent added")
                     else:
+                        try:
+                            bc.log_access(pid, "CONSENT_GIVE", did, False, reason="already_exists")
+                        except Exception:
+                            pass
                         st.warning("Consent already exists")
             with c2:
                 if st.button("Revoke Consent"):
                     patient = next((p for p in bc.users["patients"] if p["id"] == pid), None)
                     if did in patient["consent"]:
                         patient["consent"].remove(did)
-                        bc.save_state(); st.success("Consent revoked")
+                        bc.save_state();
+                        try:
+                            bc.log_access(pid, "CONSENT_REVOKE", did, True)
+                        except Exception:
+                            pass
+                        st.success("Consent revoked")
                     else:
+                        try:
+                            bc.log_access(pid, "CONSENT_REVOKE", did, False, reason="not_found")
+                        except Exception:
+                            pass
                         st.info("Nothing to revoke")
 
 
@@ -324,7 +347,14 @@ def records_page():
             if not perm_ok:
                 st.error(f"Access denied: {reason}"); bc.log_access(doctor_id, "WRITE", record_id, False, reason=reason); return
             blk = bc.add_block_with_consensus([tx])
-            if blk: st.success(f"Added in block {blk.index}"); bc.save_state()
+            if blk:
+                st.success(f"Added in block {blk.index}")
+                # Log successful write
+                try:
+                    bc.log_access(doctor_id, "WRITE", record_id.strip(), True)
+                except Exception:
+                    pass
+                bc.save_state()
             else: st.error("Failed to add block (check consensus/delegates)")
 
     with t2:
@@ -570,12 +600,65 @@ def logs_page():
     bc = st.session_state.bc
     st.subheader("Access Logs")
     if not bc.access_logs:
-        st.info("No logs")
+        st.info("No logs yet. Perform some actions (write records, give/revoke consent) to generate logs.")
         return
-    # Show latest 200 logs newest first
-    logs = list(reversed(bc.access_logs[-200:]))
-    for log in logs:
-        st.write(json.dumps(log))
+
+    # Filters
+    actions = sorted({e.get("action", "-") for e in bc.access_logs})
+    c1, c2, c3, c4 = st.columns([1,1,1,1])
+    with c1:
+        sel_actions = st.multiselect("Actions", actions, default=actions)
+    with c2:
+        user_q = st.text_input("User contains")
+    with c3:
+        record_q = st.text_input("Record contains")
+    with c4:
+        status = st.selectbox("Status", ["All", "Success", "Failed"], index=0)
+
+    # Apply filters (newest first)
+    logs = list(reversed(bc.access_logs[-500:]))
+    def _match(e: dict) -> bool:
+        if sel_actions and e.get("action") not in sel_actions:
+            return False
+        if user_q and user_q.lower() not in str(e.get("user_id", "")).lower():
+            return False
+        if record_q and record_q.lower() not in str(e.get("record_id", "")).lower():
+            return False
+        if status == "Success" and not e.get("success", False):
+            return False
+        if status == "Failed" and e.get("success", False):
+            return False
+        return True
+    logs = [e for e in logs if _match(e)]
+
+    # Summary
+    st.caption(f"Showing {len(logs)} log(s)")
+    if not logs:
+        st.info("No logs match the filters.")
+        return
+
+    # Pretty cards
+    for e in logs:
+        ok = bool(e.get("success"))
+        badge = "✅ Success" if ok else "❌ Failed"
+        reason = e.get("reason")
+        st.markdown(
+            textwrap.dedent(
+                f"""
+                <div class='log-card'>
+                    <div class='log-head'>
+                        <span class='log-time'>{e.get('timestamp','')}</span>
+                        <span class='log-badge {'ok' if ok else 'fail'}'>{badge}</span>
+                    </div>
+                    <div class='kv'>user: {e.get('user_id','-')}</div>
+                    <div class='kv'>action: {e.get('action','-')}</div>
+                    <div class='kv'>target: {e.get('record_id','-')}</div>
+                    {f"<div class='kv'>reason: {reason}</div>" if reason else ''}
+                </div>
+                """
+            ),
+            unsafe_allow_html=True,
+        )
 
     # Export buttons
     json_bytes = json.dumps(logs, indent=2).encode("utf-8")
@@ -584,22 +667,19 @@ def logs_page():
     )
 
     # Build CSV export
-    if logs:
-        keys = sorted({k for entry in logs for k in entry.keys()})
-        rows = [",".join(keys)]
-        for entry in logs:
-            row = []
-            for k in keys:
-                v = entry.get(k, "")
-                v = str(v).replace(",", ";")
-                row.append(v)
-            rows.append(
-                ",".join(row)
-            )
-        csv_bytes = ("\n".join(rows)).encode("utf-8")
-        st.download_button(
-            "Download Logs (CSV)", data=csv_bytes, file_name="access_logs.csv", mime="text/csv"
-        )
+    keys = sorted({k for entry in logs for k in entry.keys()})
+    rows = [",".join(keys)]
+    for entry in logs:
+        row = []
+        for k in keys:
+            v = entry.get(k, "")
+            v = str(v).replace(",", ";")
+            row.append(v)
+        rows.append(",".join(row))
+    csv_bytes = ("\n".join(rows)).encode("utf-8")
+    st.download_button(
+        "Download Logs (CSV)", data=csv_bytes, file_name="access_logs.csv", mime="text/csv"
+    )
 
 
 def main():

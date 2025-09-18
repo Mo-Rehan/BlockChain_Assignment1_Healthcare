@@ -62,12 +62,23 @@ def validate_transaction_data(tx: dict) -> Tuple[bool, str]:
         if len(tx["insurance_id"]) > 30:
             return False, "Insurance ID too long. Maximum 30 characters."
     
-    # Check for SQL injection patterns (basic protection)
-    dangerous_patterns = ["'", '"', ";", "--", "/*", "*/", "xp_", "sp_", "DROP", "DELETE", "INSERT", "UPDATE"]
+    # Basic protection against unsafe characters across all fields
+    # Note: IDs are already constrained by regex above; this is extra safety.
     for field, value in tx.items():
         if isinstance(value, str):
-            for pattern in dangerous_patterns:
-                if pattern.lower() in value.lower():
+            if any(ch in value for ch in ["'", '"', ";", "\\"]):
+                return False, f"Potentially dangerous characters detected in {field}"
+
+    # Context-aware SQL keyword checks: only for free-text fields (e.g., prescription/details)
+    # This avoids false-positives on enumerated fields like operation == "Update".
+    free_text_fields = {"prescription"}
+    sql_keywords = [r"\bdrop\b", r"\bdelete\b", r"\binsert\b", r"\bupdate\b", r"--", r"/\*", r"\*/", r"\bxp_", r"\bsp_"]
+    for field in free_text_fields:
+        value = tx.get(field)
+        if isinstance(value, str):
+            lower = value.lower()
+            for kw in sql_keywords:
+                if re.search(kw, lower, re.IGNORECASE):
                     return False, f"Potentially dangerous content detected in {field}"
     
     return True, "Valid transaction"

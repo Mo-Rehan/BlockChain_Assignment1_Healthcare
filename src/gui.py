@@ -100,12 +100,12 @@ def app_header():
         .stSelectbox [data-baseweb="select"] span { color: #fff !important; }
         .stSelectbox > div > div { background: #000 !important; color: #fff !important; border: 1px solid var(--card-border) !important; }
         .stSelectbox [data-baseweb="select"] svg { fill: #fff !important; }
-        /* Options list rendered in portal/popover */
-        [data-baseweb="popover"] [data-baseweb="menu"] { background: #000 !important; }
-        [data-baseweb="popover"] [data-baseweb="menu"] * { color: #fff !important; }
-        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"] { color: #fff !important; }
+        /* Options list rendered in portal/popover: WHITE background, BLACK text */
+        [data-baseweb="popover"] [data-baseweb="menu"] { background: #ffffff !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] * { color: #000000 !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"] { color: #000000 !important; }
         [data-baseweb="popover"] [data-baseweb="menu"] [aria-selected="true"],
-        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"][data-selected="true"] { color: #fff !important; background: #0b1220 !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"][data-selected="true"] { color: #000000 !important; background: #e9efff !important; }
         .block-container { background: transparent !important; }
         /* Make general text readable on dark */
         .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }

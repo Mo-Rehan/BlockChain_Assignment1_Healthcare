@@ -142,13 +142,15 @@ def users_page():
         st.markdown("---")
         st.write("Users:")
         cols = st.columns(3)
+        labels = {"doctors": "Doctors", "patients": "Patients", "admins": "Admins"}
         for i, role in enumerate(("doctors", "patients", "admins")):
             with cols[i]:
+                st.markdown(f"### {labels[role]}")
                 entries = bc.users[role]
                 if entries:
                     st.table([{k: v for k, v in u.items() if k != "consent"} for u in entries])
                 else:
-                    st.info(f"No {role} registered")
+                    st.info(f"No {labels[role].lower()} registered")
 
     with t2:
         patients = [p["id"] for p in bc.users["patients"]]

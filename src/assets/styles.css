@@ -103,4 +103,5 @@ body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100
 .chain-node { min-width: 260px; background: var(--node-bg); color: var(--text-main); border:1px solid var(--card-border); border-radius:var(--radius); padding:12px; box-shadow:0 2px 8px rgba(0,0,0,.5); }
 .chain-node h4 { margin: 0 0 8px 0; font-weight:700; letter-spacing:.12em; text-shadow: 0 0 5px rgba(0,230,118,.6); }
 .chain-node .kv { font-family: 'Share Tech Mono', monospace; font-size: .9rem; }
-.connector { height: 2px; width: 60px; background: linear-gradient(90deg, #0f1b2d, var(--accent)); box-shadow: 0 0 6px rgba(0,230,118,.6); border-radius: 2px; }
+.connector { position: relative; height: 2px; width: 60px; background: linear-gradient(90deg, #0f1b2d, var(--accent)); box-shadow: 0 0 6px rgba(0,230,118,.6); border-radius: 2px; }
+.connector:after { content: ""; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); border-left: 8px solid var(--accent); border-top: 6px solid transparent; border-bottom: 6px solid transparent; filter: drop-shadow(0 0 4px rgba(0,230,118,.6)); }

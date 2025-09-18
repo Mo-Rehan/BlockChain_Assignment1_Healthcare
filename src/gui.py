@@ -139,6 +139,25 @@ def dashboard():
                     unique_ops = sorted({t.get("operation", "?") for t in txs})
                     action = f"{len(txs)} transactions"
                     reason = ", ".join(unique_ops)
+            # Compute consent summary for this block
+            consent = "-"
+            if txs:
+                granted = 0; missing = 0
+                for t in txs:
+                    did = t.get("doctor_id"); pid = t.get("patient_id")
+                    if not did or not pid:
+                        continue
+                    patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
+                    if patient and did in patient.get("consent", []):
+                        granted += 1
+                    else:
+                        missing += 1
+                if missing == 0 and granted > 0:
+                    consent = "Granted"
+                elif granted == 0 and missing > 0:
+                    consent = "Not granted"
+                elif granted > 0 and missing > 0:
+                    consent = "Partial"
             node = f"""
             <div class='chain-node'>
                 <h4>BLOCK {blk.index}</h4>
@@ -149,6 +168,7 @@ def dashboard():
                 <div class='kv'>mode: {mode} | delegate: {producer}</div>
                 <div class='kv'>action: {action}</div>
                 <div class='kv'>reason: {reason}</div>
+                <div class='kv'>consent: {consent}</div>
             </div>
             """
             html.append(node)
@@ -383,6 +403,27 @@ def explorer_page():
         return
     idx = st.selectbox("Select Block", list(range(len(bc.chain))))
     blk = bc.chain[idx]
+    # Compute consent status for displayed block based on current patient consents
+    def _consent_status_for_block(block) -> str:
+        granted = 0
+        missing = 0
+        for t in (block.transactions or []):
+            did = t.get("doctor_id"); pid = t.get("patient_id")
+            if not did or not pid:
+                continue
+            patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
+            if patient and did in patient.get("consent", []):
+                granted += 1
+            else:
+                missing += 1
+        if granted == 0 and missing == 0:
+            return "-"
+        if missing == 0:
+            return "Granted"
+        if granted == 0:
+            return "Not granted"
+        return "Partial"
+    consent_status = _consent_status_for_block(blk)
     c1, c2 = st.columns(2)
     with c1:
         st.write("Index:", blk.index)
@@ -390,7 +431,7 @@ def explorer_page():
         st.write("Prev Hash:", blk.prev_hash)
         st.write("Merkle Root:", blk.merkle_root)
         st.write("Hash:", blk.hash())
-        st.write("Nonce:", blk.nonce)
+        st.write("Consent:", consent_status)
     with c2:
         st.write("Consensus:", json.dumps(blk.consensus_data, indent=2))
     st.write("Transactions:")
@@ -445,6 +486,25 @@ def chain_page():
                 unique_ops = sorted({t.get("operation", "?") for t in txs})
                 action = f"{len(txs)} transactions"
                 reason = ", ".join(unique_ops)
+        # Compute consent summary for this block
+        consent = "-"
+        if txs:
+            granted = 0; missing = 0
+            for t in txs:
+                did = t.get("doctor_id"); pid = t.get("patient_id")
+                if not did or not pid:
+                    continue
+                patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
+                if patient and did in patient.get("consent", []):
+                    granted += 1
+                else:
+                    missing += 1
+            if missing == 0 and granted > 0:
+                consent = "Granted"
+            elif granted == 0 and missing > 0:
+                consent = "Not granted"
+            elif granted > 0 and missing > 0:
+                consent = "Partial"
         node = f"""
         <div class='chain-node'>
             <h4>BLOCK {blk.index}</h4>
@@ -455,6 +515,7 @@ def chain_page():
             <div class='kv'>mode: {mode} | delegate: {producer}</div>
             <div class='kv'>action: {action}</div>
             <div class='kv'>reason: {reason}</div>
+            <div class='kv'>consent: {consent}</div>
         </div>
         """
         html.append(node)

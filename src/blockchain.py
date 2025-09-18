@@ -35,6 +35,8 @@ class Blockchain:
         self.stake_cap: float | None = None
         # Patient voting: map patient_id -> doctor_id (their current vote)
         self.votes: dict[str, str] = {}
+        # Round-robin producer pointer for DPoS
+        self.producer_pointer: int = 0
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -126,15 +128,19 @@ class Blockchain:
         consensus_meta = {"mode": mode}
         producer = None
         if mode == "DPoS":
-            # Stake-weighted random choice among delegates (doctors only)
+            # Round-robin over current delegates (doctors only)
             candidates = [d for d in self.delegates if self.find_user(d) and not self.is_patient(d)]
             if candidates:
-                weights = [max(self.get_stake(d), 0.0001) for d in candidates]
-                try:
-                    producer = random.choices(candidates, weights=weights, k=1)[0]
-                except Exception:
-                    producer = candidates[0]
-                consensus_meta["weights"] = {d: self.get_stake(d) for d in candidates}
+                # Ensure pointer in range
+                if self.producer_pointer >= len(candidates) or self.producer_pointer < 0:
+                    self.producer_pointer = 0
+                pointer_before = self.producer_pointer
+                producer = candidates[self.producer_pointer]
+                # Advance pointer
+                self.producer_pointer = (self.producer_pointer + 1) % len(candidates)
+                consensus_meta["schedule"] = candidates
+                consensus_meta["pointer_before"] = pointer_before
+                consensus_meta["pointer_after"] = self.producer_pointer
             else:
                 producer = None
         else:
@@ -243,6 +249,7 @@ class Blockchain:
             "stakes": self.stakes,
             "stake_cap": self.stake_cap,
             "votes": self.votes,
+            "producer_pointer": self.producer_pointer,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -271,6 +278,8 @@ class Blockchain:
         self.stake_cap = None
         # Load votes
         self.votes = data.get("votes", {})
+        # Load round-robin pointer (guard against OOB)
+        self.producer_pointer = int(data.get("producer_pointer", 0) or 0)
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []

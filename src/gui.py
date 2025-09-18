@@ -639,42 +639,109 @@ def chain_page():
 
 def admin_page():
     bc = st.session_state.bc
-    if not bc.chain:
-        if st.button("Create Genesis Block"):
-            bc.create_genesis(); bc.save_state(); st.success("Genesis created")
-            try:
-                bc.log_access("system", "GENESIS_CREATE", "-", True)
-            except Exception:
-                pass
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("Validate Chain (built-in)"):
-            ok = bc.validate_chain()
-            st.success("Chain valid") if ok else st.error("Chain invalid")
-            try:
-                bc.log_access("system", "VALIDATE_CHAIN_BUILTIN", "-", bool(ok))
-            except Exception:
-                pass
-    with c2:
-        confirm = st.checkbox("Confirm fix before running")
-        if st.button("Fix Chain Links/Merkle"):
-            if confirm:
-                bc.fix_chain_integrity()
+    st.subheader("Admin")
+    t1, t2 = st.tabs(["Register User", "Staking"])
+
+    # Tab 1: Register User (Admin can register doctors/patients/admins)
+    with t1:
+        role = st.selectbox("Role", ["doctor", "patient", "admin"], key="admin_reg_role")
+        uid = st.text_input("ID", key="admin_reg_id")
+        name = st.text_input("Name", key="admin_reg_name")
+        if st.button("Register", key="admin_btn_register"):
+            if not uid or not name:
+                st.error("ID and Name required")
+            elif bc.find_user(uid):
+                st.error("User already exists")
+            else:
+                if role == "doctor":
+                    bc.users["doctors"].append({"id": uid, "name": name})
+                elif role == "patient":
+                    bc.users["patients"].append({"id": uid, "name": name, "consent": []})
+                else:
+                    bc.users["admins"].append({"id": uid, "name": name})
+                bc.save_state(); st.success("User registered")
                 try:
-                    bc.log_access("system", "FIX_CHAIN", "-", True)
+                    bc.log_access(uid, "REGISTER_USER", uid, True, role=role)
                 except Exception:
                     pass
-            else:
-                st.warning("Please confirm before fixing")
-    with c3:
-        if st.button("Save State"):
-            bc.save_state(); st.success("Saved")
-            try:
-                bc.log_access("system", "SAVE_STATE", "-", True)
-            except Exception:
-                pass
 
-    # Logs moved to separate Logs page
+        st.markdown("---")
+        st.caption("Current users")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.write("Doctors")
+            st.table(bc.users.get("doctors", []))
+        with c2:
+            st.write("Patients")
+            st.table([{k: v for k, v in p.items() if k != "consent"} for p in bc.users.get("patients", [])])
+        with c3:
+            st.write("Admins")
+            st.table(bc.users.get("admins", []))
+
+    # Tab 2: Staking (Admin assigns stake to doctor/patient)
+    with t2:
+        st.caption("Assign stake to a doctor or patient. Stake is a numeric weight used by DPoS.")
+        # Build selectable list of all non-admin users
+        all_users = (
+            [(d["id"], f"Doctor: {d['id']} - {d['name']}") for d in bc.users.get("doctors", [])]
+            + [(p["id"], f"Patient: {p['id']} - {p['name']}") for p in bc.users.get("patients", [])]
+        )
+        if not all_users:
+            st.info("No doctors or patients registered yet.")
+        else:
+            user_options = {uid: label for uid, label in all_users}
+            selected_uid = st.selectbox("Select User", list(user_options.keys()), format_func=lambda k: user_options[k])
+            current_stake = bc.get_stake(selected_uid)
+            st.write(f"Current stake: {current_stake}")
+            new_stake = st.text_input("New stake (number)", value=str(current_stake), key="stake_input")
+            c1, c2 = st.columns([1,1])
+            with c1:
+                if st.button("Set Stake", key="btn_set_stake"):
+                    ok, msg = bc.set_stake(selected_uid, new_stake)
+                    if ok:
+                        bc.save_state(); st.success("Stake updated")
+                        try:
+                            role = "doctor" if bc.is_doctor(selected_uid) else ("patient" if bc.is_patient(selected_uid) else "-")
+                            bc.log_access("admin", "STAKE_SET", selected_uid, True, role=role, stake=float(new_stake))
+                        except Exception:
+                            pass
+                    else:
+                        st.error(msg)
+                        try:
+                            bc.log_access("admin", "STAKE_SET", selected_uid, False, reason=msg)
+                        except Exception:
+                            pass
+            with c2:
+                if st.button("Clear Stake", key="btn_clear_stake"):
+                    ok, msg = bc.set_stake(selected_uid, 0)
+                    if ok:
+                        bc.save_state(); st.info("Stake cleared")
+                        try:
+                            role = "doctor" if bc.is_doctor(selected_uid) else ("patient" if bc.is_patient(selected_uid) else "-")
+                            bc.log_access("admin", "STAKE_SET", selected_uid, True, role=role, stake=0)
+                        except Exception:
+                            pass
+                    else:
+                        st.error(msg)
+
+        st.markdown("---")
+        st.caption("Current stakes")
+        # Build stakes table
+        stake_rows = []
+        for role_name in ("doctors", "patients"):
+            for u in bc.users.get(role_name, []):
+                stake_rows.append({
+                    "id": u.get("id"),
+                    "name": u.get("name"),
+                    "role": "doctor" if role_name == "doctors" else "patient",
+                    "stake": bc.get_stake(u.get("id")),
+                })
+        if stake_rows:
+            st.table(stake_rows)
+        else:
+            st.info("No stakes assigned yet.")
+
+    # Note: Logs are available in the dedicated Logs page
 
 
 def logs_page():

@@ -28,6 +28,8 @@ class Blockchain:
         # DPoS consensus variables
         self.consensus_mode = None
         self.delegates = []
+        # Stakes for users (doctor/patient). Map user_id -> numeric stake
+        self.stakes: dict[str, float] = {}
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -237,7 +239,8 @@ class Blockchain:
             "users": self.users,
             "access_logs": self.access_logs,
             "consensus_mode": self.consensus_mode,
-            "delegates": self.delegates
+            "delegates": self.delegates,
+            "stakes": self.stakes,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -261,6 +264,8 @@ class Blockchain:
         self.delegates = filtered
         if removed:
             print(f"Removed invalid patient delegates from state: {sorted(list(removed))}")
+        # Load stakes
+        self.stakes = data.get("stakes", {})
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -279,6 +284,25 @@ class Blockchain:
             block.merkle_root = computed_merkle
             self.chain.append(block)
         print("Blockchain state loaded from", filename)
+
+    # --- Stakes helpers ---
+    def set_stake(self, user_id: str, amount: float) -> tuple[bool, str]:
+        try:
+            amt = float(amount)
+        except Exception:
+            return False, "Stake must be a number"
+        if amt < 0:
+            return False, "Stake cannot be negative"
+        if not self.find_user(user_id):
+            return False, "User not found"
+        self.stakes[user_id] = amt
+        return True, "Stake set"
+
+    def get_stake(self, user_id: str) -> float:
+        try:
+            return float(self.stakes.get(user_id, 0))
+        except Exception:
+            return 0.0
 
     def validate_chain(self) -> bool:
         if not self.chain:

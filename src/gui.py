@@ -137,8 +137,11 @@ def dashboard():
             if isinstance(getattr(blk, "consensus_data", None), dict):
                 mode = blk.consensus_data.get("mode", "-")
                 producer = blk.consensus_data.get("producer", "-")
-            # Producer stake (if any)
-            p_stake = bc.get_stake(producer) if producer and producer != "-" else 0
+            # Producer stake at the time of this block (prefer per-block JSON snapshot)
+            if isinstance(getattr(blk, "consensus_data", None), dict) and "producer_stake" in blk.consensus_data:
+                p_stake = blk.consensus_data.get("producer_stake", 0)
+            else:
+                p_stake = _stake_at_block(bc, blk.index, producer) if producer and producer != "-" else 0
             # Derive action and reason from transactions
             action = "No transactions"
             reason = "-"
@@ -781,8 +784,11 @@ def chain_page():
         if isinstance(getattr(blk, "consensus_data", None), dict):
             mode = blk.consensus_data.get("mode", "-")
             producer = blk.consensus_data.get("producer", "-")
-        # Producer stake at the time of this block (historical snapshot)
-        p_stake = _stake_at_block(bc, blk.index, producer) if producer and producer != "-" else 0
+        # Producer stake at the time of this block (prefer per-block JSON snapshot)
+        if isinstance(getattr(blk, "consensus_data", None), dict) and "producer_stake" in blk.consensus_data:
+            p_stake = blk.consensus_data.get("producer_stake", 0)
+        else:
+            p_stake = _stake_at_block(bc, blk.index, producer) if producer and producer != "-" else 0
         # Derive action and reason from transactions
         action = "No transactions"
         reason = "-"

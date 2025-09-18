@@ -302,8 +302,11 @@ class Blockchain:
                     breakdown=breakdown,
                     stakes={k: round(float(v), 6) for k, v in self.stakes.items()},
                 )
-                # After updating stakes, capture a state snapshot root in this block
+                # After updating stakes, capture producer stake and state snapshot in this block
                 try:
+                    # Persist producer stake at the time of this block (after rewards)
+                    if producer:
+                        block.consensus_data["producer_stake"] = round(float(self.get_stake(producer)), 6)
                     block.consensus_data["state_root"] = self.compute_state_root()
                 except Exception:
                     # non-fatal

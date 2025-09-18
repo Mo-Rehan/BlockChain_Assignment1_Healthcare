@@ -1,5 +1,6 @@
 import json
 import time
+import textwrap
 import streamlit as st
 import os
 import sys
@@ -154,7 +155,7 @@ def dashboard():
                     patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
                     if patient and did in patient.get("consent", []):
                         consent_pairs_pd.append(f"{pid}→{did}")
-            node = f"""
+            node = textwrap.dedent(f"""
             <div class='chain-node'>
                 <h4>BLOCK {blk.index}</h4>
                 <div class='kv'>time: {blk.timestamp}</div>
@@ -166,7 +167,7 @@ def dashboard():
                 <div class='kv'>reason: {reason}</div>
                 {f"<div class='kv'>consent pairs: {', '.join(consent_pairs_pd)}</div>" if consent_pairs_pd else ""}
             </div>
-            """
+            """)
             html.append(node)
             if i < len(bc.chain) - 1:
                 html.append("<div class='connector'></div>")
@@ -501,7 +502,7 @@ def chain_page():
                 consent = "Not granted"
             elif granted > 0 and missing > 0:
                 consent = "Partial"
-        node = f"""
+        node = textwrap.dedent(f"""
         <div class='chain-node'>
             <h4>BLOCK {blk.index}</h4>
             <div class='kv'>time: {blk.timestamp}</div>
@@ -513,7 +514,7 @@ def chain_page():
             <div class='kv'>reason: {reason}</div>
             <div class='kv'>consent: {consent}</div>
         </div>
-        """
+        """)
         html.append(node)
         if i < len(bc.chain) - 1:
             html.append("<div class='connector'></div>")

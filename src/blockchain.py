@@ -337,6 +337,15 @@ class Blockchain:
         self.producer_pointer = int(data.get("producer_pointer", 0) or 0)
         # Load winners pointer
         self.winners_pointer = int(data.get("winners_pointer", 0) or 0)
+        # Ensure default stake entries for all users
+        try:
+            for role_name in ("doctors", "patients", "admins"):
+                for u in self.users.get(role_name, []):
+                    uid = u.get("id")
+                    if uid is not None and uid not in self.stakes:
+                        self.stakes[uid] = 0.0
+        except Exception:
+            pass
         # Load economic params and balances
         self.block_reward = float(data.get("block_reward", 100.0))
         self.share_ratio = float(data.get("share_ratio", 0.30))

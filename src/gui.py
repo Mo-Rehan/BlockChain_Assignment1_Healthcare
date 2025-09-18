@@ -842,6 +842,14 @@ def admin_page():
                     bc.users["patients"].append({"id": uid, "name": name, "consent": []})
                 else:
                     bc.users["admins"].append({"id": uid, "name": name})
+                # Initialize default stake = 0 for the new user
+                try:
+                    if not hasattr(bc, "stakes") or bc.stakes is None:
+                        bc.stakes = {}
+                    if uid not in bc.stakes:
+                        bc.stakes[uid] = 0.0
+                except Exception:
+                    pass
                 bc.save_state(); st.success("User registered")
                 try:
                     bc.log_access(uid, "REGISTER_USER", uid, True, role=role)
@@ -930,6 +938,26 @@ def admin_page():
 def logs_page():
     bc = st.session_state.bc
     st.subheader("Access Logs")
+    # Current Stakes snapshot table
+    try:
+        stake_rows = []
+        for role_name in ("doctors", "patients", "admins"):
+            for u in bc.users.get(role_name, []):
+                uid = u.get("id")
+                stake_rows.append({
+                    "id": uid,
+                    "name": u.get("name"),
+                    "role": "doctor" if role_name == "doctors" else ("patient" if role_name == "patients" else "admin"),
+                    "stake": bc.get_stake(uid) if hasattr(bc, "get_stake") else (bc.stakes.get(uid, 0.0) if hasattr(bc, "stakes") else 0.0),
+                })
+        st.markdown("### Current Stakes")
+        if stake_rows:
+            st.table(stake_rows)
+        else:
+            st.caption("No users to show stakes for.")
+    except Exception:
+        pass
+
     if not bc.access_logs:
         st.info("No logs yet. Perform some actions (write records, give/revoke consent) to generate logs.")
         return

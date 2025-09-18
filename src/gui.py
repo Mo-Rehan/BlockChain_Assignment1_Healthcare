@@ -372,7 +372,7 @@ def explorer_page():
         st.write("Consensus:", json.dumps(blk.consensus_data, indent=2))
     st.write("Transactions:")
     for i, tx in enumerate(blk.transactions):
-        with st.expander(f"Transaction {i+1}: {tx.get('record_id','?')}"):
+        with st.expander(f"{tx.get('record_id','?')}"):
             st.code(json.dumps(tx, indent=2), language="json")
 
 

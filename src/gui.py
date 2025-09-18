@@ -139,25 +139,21 @@ def dashboard():
                     unique_ops = sorted({t.get("operation", "?") for t in txs})
                     action = f"{len(txs)} transactions"
                     reason = ", ".join(unique_ops)
-            # Compute consent summary for this block
-            consent = "-"
+            # Compute consent pairs (patient -> doctor) for this block (Dashboard view)
+            consent_pairs_pd = []
             if txs:
-                granted = 0; missing = 0
+                seen = set()
                 for t in txs:
                     did = t.get("doctor_id"); pid = t.get("patient_id")
                     if not did or not pid:
                         continue
+                    key = (pid, did)
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
                     if patient and did in patient.get("consent", []):
-                        granted += 1
-                    else:
-                        missing += 1
-                if missing == 0 and granted > 0:
-                    consent = "Granted"
-                elif granted == 0 and missing > 0:
-                    consent = "Not granted"
-                elif granted > 0 and missing > 0:
-                    consent = "Partial"
+                        consent_pairs_pd.append(f"{pid}→{did}")
             node = f"""
             <div class='chain-node'>
                 <h4>BLOCK {blk.index}</h4>
@@ -168,7 +164,7 @@ def dashboard():
                 <div class='kv'>mode: {mode} | delegate: {producer}</div>
                 <div class='kv'>action: {action}</div>
                 <div class='kv'>reason: {reason}</div>
-                <div class='kv'>consent: {consent}</div>
+                {f"<div class='kv'>consent pairs: {', '.join(consent_pairs_pd)}</div>" if consent_pairs_pd else ""}
             </div>
             """
             html.append(node)

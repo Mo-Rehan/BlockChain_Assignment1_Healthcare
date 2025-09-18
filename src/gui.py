@@ -87,6 +87,11 @@ def app_header():
         [data-testid="stAppViewContainer"] { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100%) !important; }
         [data-testid="stHeader"], [data-testid="stToolbar"] { background: transparent !important; }
         [data-testid="stSidebar"] { background: var(--node-bg) !important; border-right: 1px solid var(--card-border); }
+        /* Sidebar navigation text color */
+        [data-testid="stSidebar"] label { color: var(--card-fg) !important; }
+        [data-testid="stSidebar"] .stRadio > div { background: var(--node-bg); }
+        [data-testid="stSidebar"] .stRadio > div > label { color: var(--card-fg) !important; }
+        [data-testid="stSidebar"] .stRadio > div > label > div { color: var(--card-fg) !important; }
         .block-container { background: transparent !important; }
         /* Make general text readable on dark */
         .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }

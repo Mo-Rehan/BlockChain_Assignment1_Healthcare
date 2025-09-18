@@ -48,23 +48,49 @@ body { background: linear-gradient(180deg, var(--body-g1) 0%, var(--body-g2) 100
 .stTextInput>div>div>input, .stTextArea textarea { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
 .stTextInput label, .stTextArea label, .stSelectbox label, label { color: var(--card-fg) !important; }
 .stTextInput input::placeholder, .stTextArea textarea::placeholder { color: rgba(215,255,230,.6) !important; }
-.stSelectbox>div>div { border-radius: var(--radius) !important; background: var(--node-bg); color: var(--card-fg); border: 1px solid var(--card-border); }
+.stSelectbox>div>div { border-radius: var(--radius) !important; background: #fff; color: #000; border: 1px solid var(--card-border); }
 
-/* Selectbox control area and popover menu for perfect contrast */
-/* Closed control (selected value) */
-.stSelectbox [data-baseweb="select"] { color: #fff !important; }
-.stSelectbox [data-baseweb="select"] * { color: #fff !important; }
+/* Selectbox control and popover menu for high contrast */
+/* Closed control (selected value) - WHITE background with BLACK text */
+.stSelectbox [data-baseweb="select"] { color: #000 !important; }
+.stSelectbox [data-baseweb="select"] * { color: #000 !important; }
 .stSelectbox [data-baseweb="select"] [role="combobox"],
 .stSelectbox [data-baseweb="select"] input,
-.stSelectbox [data-baseweb="select"] span { color: #fff !important; }
-.stSelectbox > div > div { background: #000 !important; color: #fff !important; border: 1px solid var(--card-border) !important; }
-.stSelectbox [data-baseweb="select"] svg { fill: #fff !important; }
-/* Opened list (popover) */
-[data-baseweb="popover"] [data-baseweb="menu"] { background: #ffffff !important; }
-[data-baseweb="popover"] [data-baseweb="menu"] * { color: #000000 !important; }
-[data-baseweb="popover"] [data-baseweb="menu"] [role="option"] { color: #000000 !important; }
-[data-baseweb="popover"] [data-baseweb="menu"] [aria-selected="true"],
-[data-baseweb="popover"] [data-baseweb="menu"] [role="option"][data-selected="true"] { color: #000000 !important; background: #e9efff !important; }
+.stSelectbox [data-baseweb="select"] span { color: #000 !important; }
+.stSelectbox > div > div { background: #fff !important; color: #000 !important; border: 1px solid var(--card-border) !important; }
+.stSelectbox [data-baseweb="select"] svg { fill: #000 !important; }
+/* Opened list (popover) - force WHITE background with BLACK text */
+[data-baseweb="menu"],
+[data-baseweb="menu"] *,
+[role="listbox"],
+[role="listbox"] *,
+.stSelectbox [data-baseweb="popover"] [data-baseweb="menu"],
+.stSelectbox [data-baseweb="popover"] [data-baseweb="menu"] * {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+[role="listbox"],
+.stSelectbox [role="listbox"] { background-color: #ffffff !important; color: #000000 !important; }
+[role="option"],
+.stSelectbox [role="option"] { color: #000000 !important; }
+.stSelectbox [role="option"] * { color: #000000 !important; }
+[data-baseweb="menu"] { border: 1px solid var(--card-border) !important; box-shadow: 0 6px 20px rgba(0,0,0,.25) !important; }
+[data-baseweb="menu"] [role="option"],
+[role="listbox"] [role="option"] { color: #000000 !important; }
+[data-baseweb="menu"] [aria-selected="true"],
+[data-baseweb="menu"] [role="option"][data-selected="true"],
+[role="listbox"] [aria-selected="true"] {
+  color: #000000 !important;
+  background: #e9efff !important;
+}
+/* Extra safety: target generic option containers sometimes used by BaseWeb */
+[data-baseweb="option"],
+.stSelectbox [data-baseweb="option"] {
+  color: #000000 !important;
+  background: #ffffff !important;
+}
+/* Placeholder text inside select */
+.stSelectbox [data-baseweb="select"] input::placeholder { color: #666 !important; }
 
 /* Tabs, metrics, and decorative text */
 [data-baseweb="tabs"] { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--card-border); }

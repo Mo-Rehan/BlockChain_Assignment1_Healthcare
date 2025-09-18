@@ -139,24 +139,25 @@ def dashboard():
                     unique_ops = sorted({t.get("operation", "?") for t in txs})
                     action = f"{len(txs)} transactions"
                     reason = ", ".join(unique_ops)
-            # Compute consent pairs for this block
-            consent_pairs_granted = []
-            consent_pairs_missing = []
+            # Compute consent summary for this block
+            consent = "-"
             if txs:
-                seen = set()
+                granted = 0; missing = 0
                 for t in txs:
                     did = t.get("doctor_id"); pid = t.get("patient_id")
                     if not did or not pid:
                         continue
-                    key = (did, pid)
-                    if key in seen:
-                        continue
-                    seen.add(key)
                     patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
                     if patient and did in patient.get("consent", []):
-                        consent_pairs_granted.append(f"{did}→{pid}")
+                        granted += 1
                     else:
-                        consent_pairs_missing.append(f"{did}→{pid}")
+                        missing += 1
+                if missing == 0 and granted > 0:
+                    consent = "Granted"
+                elif granted == 0 and missing > 0:
+                    consent = "Not granted"
+                elif granted > 0 and missing > 0:
+                    consent = "Partial"
             node = f"""
             <div class='chain-node'>
                 <h4>BLOCK {blk.index}</h4>
@@ -167,8 +168,7 @@ def dashboard():
                 <div class='kv'>mode: {mode} | delegate: {producer}</div>
                 <div class='kv'>action: {action}</div>
                 <div class='kv'>reason: {reason}</div>
-                {f"<div class='kv'>consent: {', '.join(consent_pairs_granted)}</div>" if consent_pairs_granted else ""}
-                {f"<div class='kv'>no consent: {', '.join(consent_pairs_missing)}</div>" if consent_pairs_missing else ""}
+                <div class='kv'>consent: {consent}</div>
             </div>
             """
             html.append(node)
@@ -486,24 +486,25 @@ def chain_page():
                 unique_ops = sorted({t.get("operation", "?") for t in txs})
                 action = f"{len(txs)} transactions"
                 reason = ", ".join(unique_ops)
-        # Compute consent pairs for this block
-        consent_pairs_granted = []
-        consent_pairs_missing = []
+        # Compute consent summary for this block
+        consent = "-"
         if txs:
-            seen = set()
+            granted = 0; missing = 0
             for t in txs:
                 did = t.get("doctor_id"); pid = t.get("patient_id")
                 if not did or not pid:
                     continue
-                key = (did, pid)
-                if key in seen:
-                    continue
-                seen.add(key)
                 patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
                 if patient and did in patient.get("consent", []):
-                    consent_pairs_granted.append(f"{did}→{pid}")
+                    granted += 1
                 else:
-                    consent_pairs_missing.append(f"{did}→{pid}")
+                    missing += 1
+            if missing == 0 and granted > 0:
+                consent = "Granted"
+            elif granted == 0 and missing > 0:
+                consent = "Not granted"
+            elif granted > 0 and missing > 0:
+                consent = "Partial"
         node = f"""
         <div class='chain-node'>
             <h4>BLOCK {blk.index}</h4>
@@ -514,8 +515,7 @@ def chain_page():
             <div class='kv'>mode: {mode} | delegate: {producer}</div>
             <div class='kv'>action: {action}</div>
             <div class='kv'>reason: {reason}</div>
-            {f"<div class='kv'>consent: {', '.join(consent_pairs_granted)}</div>" if consent_pairs_granted else ""}
-            {f"<div class='kv'>no consent: {', '.join(consent_pairs_missing)}</div>" if consent_pairs_missing else ""}
+            <div class='kv'>consent: {consent}</div>
         </div>
         """
         html.append(node)

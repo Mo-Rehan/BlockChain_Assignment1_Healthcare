@@ -91,10 +91,21 @@ def app_header():
         [data-testid="stSidebar"] label { color: var(--card-fg) !important; }
         [data-testid="stSidebar"] .stRadio > div { background: var(--node-bg); }
         [data-testid="stSidebar"] .stRadio > div > label { color: var(--card-fg) !important; }
-        /* Role selection dropdown text color */
-        [data-baseweb="select"] div[aria-selected] { color: #000000 !important; }
-        [data-baseweb="select"] div[role="option"] { color: #000000 !important; }
-        [data-baseweb="select"] svg { fill: #000000 !important; }
+        /* Selectbox (dropdown) readability: black text on white */
+        /* Control area (shows selected value) */
+        .stSelectbox [data-baseweb="select"] { color: #000 !important; }
+        .stSelectbox [data-baseweb="select"] * { color: #000 !important; }
+        .stSelectbox [data-baseweb="select"] [role="combobox"] { color: #000 !important; }
+        .stSelectbox [data-baseweb="select"] input { color: #000 !important; caret-color: #000 !important; }
+        .stSelectbox [data-baseweb="select"] span { color: #000 !important; }
+        .stSelectbox > div > div { background: #fff !important; color: #000 !important; border: 1px solid var(--card-border) !important; }
+        .stSelectbox [data-baseweb="select"] svg { fill: #000 !important; }
+        /* Options list rendered in portal/popover */
+        [data-baseweb="popover"] [data-baseweb="menu"] { background: #fff !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] * { color: #000 !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"] { color: #000 !important; }
+        [data-baseweb="popover"] [data-baseweb="menu"] [aria-selected="true"],
+        [data-baseweb="popover"] [data-baseweb="menu"] [role="option"][data-selected="true"] { color: #000 !important; background: #f2f5ff !important; }
         .block-container { background: transparent !important; }
         /* Make general text readable on dark */
         .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }

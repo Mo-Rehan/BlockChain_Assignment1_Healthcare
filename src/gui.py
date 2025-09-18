@@ -96,24 +96,60 @@ def dashboard():
     with c3: st.metric("Patients", len(bc.users["patients"]))
     with c4: st.metric("Admins", len(bc.users["admins"]))
 
-    st.subheader("Recent Logs")
-    logs = bc.access_logs[-5:]
-    if not logs:
-        st.info("No logs yet")
+    st.subheader("Chain Overview")
+    if not bc.chain:
+        st.info("Create a genesis block first from Admin page or by adding a record")
     else:
-        for e in reversed(logs):
-            st.write(f"{e['timestamp']} | {e['user_id']} | {e['action']} | {e['record_id']}" + (f" | {e['reason']}" if e.get('reason') else ""))
+        # Compact chain visual similar to chain_page
+        show_full = False
+        def fmt(s: str) -> str:
+            if show_full or not s:
+                return s
+            return (s[:10] + "…" + s[-6:]) if isinstance(s, str) and len(s) > 18 else s
+
+        html = ["<div class='chain-wrap'>"]
+        for i, blk in enumerate(bc.chain):
+            try:
+                bhash = blk.hash()
+            except Exception:
+                bhash = ""
+            mode = "-"; producer = "-"
+            if isinstance(getattr(blk, "consensus_data", None), dict):
+                mode = blk.consensus_data.get("mode", "-")
+                producer = blk.consensus_data.get("producer", "-")
+            node = f"""
+            <div class='chain-node'>
+                <h4>BLOCK {blk.index}</h4>
+                <div class='kv'>time: {blk.timestamp}</div>
+                <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
+                <div class='kv'>hash: {fmt(bhash)}</div>
+                <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
+                <div class='kv'>mode: {mode} | delegate: {producer}</div>
+                <div class='kv'>tx: {len(blk.transactions)}</div>
+            </div>
+            """
+            html.append(node)
+            if i < len(bc.chain) - 1:
+                html.append("<div class='connector'></div>")
+        html.append("</div>")
+        st.markdown("".join(html), unsafe_allow_html=True)
 
     st.subheader("Validation")
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Validate Chain (external)"):
             ok, msg = ext_validate_chain(bc)
-            st.success(msg) if ok else st.error(msg)
+            if ok:
+                st.success("Chain integrity validated")
+            else:
+                st.error("Chain integrity failed")
     with c2:
         if st.button("Validate Consensus"):
             ok, msg = validate_consensus_integrity(bc)
-            st.success(msg) if ok else st.error(msg)
+            if ok:
+                st.success("Consensus integrity validated")
+            else:
+                st.error("Consensus integrity failed")
 
 
 def users_page():
@@ -424,29 +460,43 @@ def admin_page():
         if st.button("Save State"):
             bc.save_state(); st.success("Saved")
 
+    # Logs moved to separate Logs page
+
+
+def logs_page():
+    bc = st.session_state.bc
     st.subheader("Access Logs")
     if not bc.access_logs:
         st.info("No logs")
-    else:
-        logs = list(reversed(bc.access_logs[-200:]))
-        for log in logs:
-            st.write(json.dumps(log))
-        # Export buttons
-        json_bytes = json.dumps(logs, indent=2).encode("utf-8")
-        st.download_button("Download Logs (JSON)", data=json_bytes, file_name="access_logs.json", mime="application/json")
-        # Build CSV
-        if logs:
-            keys = sorted({k for entry in logs for k in entry.keys()})
-            rows = [",".join(keys)]
-            for entry in logs:
-                row = []
-                for k in keys:
-                    v = entry.get(k, "")
-                    v = str(v).replace(",", ";")
-                    row.append(v)
-                rows.append(",".join(row))
-            csv_bytes = ("\n".join(rows)).encode("utf-8")
-            st.download_button("Download Logs (CSV)", data=csv_bytes, file_name="access_logs.csv", mime="text/csv")
+        return
+    # Show latest 200 logs newest first
+    logs = list(reversed(bc.access_logs[-200:]))
+    for log in logs:
+        st.write(json.dumps(log))
+
+    # Export buttons
+    json_bytes = json.dumps(logs, indent=2).encode("utf-8")
+    st.download_button(
+        "Download Logs (JSON)", data=json_bytes, file_name="access_logs.json", mime="application/json"
+    )
+
+    # Build CSV export
+    if logs:
+        keys = sorted({k for entry in logs for k in entry.keys()})
+        rows = [",".join(keys)]
+        for entry in logs:
+            row = []
+            for k in keys:
+                v = entry.get(k, "")
+                v = str(v).replace(",", ";")
+                row.append(v)
+            rows.append(
+                ",".join(row)
+            )
+        csv_bytes = ("\n".join(rows)).encode("utf-8")
+        st.download_button(
+            "Download Logs (CSV)", data=csv_bytes, file_name="access_logs.csv", mime="text/csv"
+        )
 
 
 def main():
@@ -454,7 +504,7 @@ def main():
     app_header()
     page = st.sidebar.radio(
         "Navigate",
-        ["Dashboard", "Users", "Records", "Consensus", "Explorer", "Chain", "Admin"],
+        ["Dashboard", "Users", "Records", "Consensus", "Explorer", "Chain", "Logs", "Admin"],
         index=0,
     )
     if page == "Dashboard":
@@ -469,6 +519,8 @@ def main():
         explorer_page()
     elif page == "Chain":
         chain_page()
+    elif page == "Logs":
+        logs_page()
     else:
         admin_page()
 

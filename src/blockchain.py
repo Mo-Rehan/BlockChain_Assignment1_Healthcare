@@ -50,11 +50,15 @@ class Blockchain:
         
     def _init_stakes(self):
         """Ensure all users have a stake entry (default 0.0)"""
+        added = 0
         for role in ("doctors", "patients", "admins"):
             for user in self.users.get(role, []):
                 user_id = user.get("id")
                 if user_id and user_id not in self.stakes:
                     self.stakes[user_id] = 0.0
+                    added += 1
+        if added > 0:
+            print(f"_init_stakes: Added {added} new stake entries (total: {len(self.stakes)})")
 
     # --- Role helper utilities ---
     def is_patient(self, uid: str) -> bool:
@@ -298,8 +302,17 @@ class Blockchain:
                     breakdown=breakdown,
                     stakes={k: round(float(v), 6) for k, v in self.stakes.items()},
                 )
-            except Exception:
-                pass
+                # After updating stakes, capture a state snapshot root in this block
+                try:
+                    block.consensus_data["state_root"] = self.compute_state_root()
+                except Exception:
+                    # non-fatal
+                    pass
+                # Save state after updating stakes
+                self.save_state()
+                print(f"Stakes updated and saved. Producer {producer} new stake: {self.get_stake(producer)}")
+            except Exception as e:
+                print(f"Error saving state after reward distribution: {e}")
         except Exception as e:
             print("Reward distribution failed:", e)
         finally:
@@ -395,6 +408,10 @@ class Blockchain:
         # Load stakes (cap is deprecated/ignored)
         self.stakes = data.get("stakes", {})
         self.stake_cap = None
+        
+        # Ensure all users have a stake entry
+        self._init_stakes()
+        print(f"Initialized stakes for {len(self.stakes)} users")
         # Load votes
         self.votes = data.get("votes", {})
         # Load round-robin pointer (guard against OOB)
@@ -445,7 +462,13 @@ class Blockchain:
         if not self.find_user(user_id):
             return False, "User not found"
         self.stakes[user_id] = amt
-        return True, "Stake set"
+        try:
+            self.save_state()
+            print(f"Stake updated for {user_id}: {amt} (saved to disk)")
+            return True, "Stake set"
+        except Exception as e:
+            print(f"Error saving stake for {user_id}: {e}")
+            return False, f"Failed to save stake: {e}"
 
     def get_stake(self, user_id: str) -> float:
         try:
@@ -592,3 +615,20 @@ class Blockchain:
             print("Blockchain was already valid.")
 
         return True
+
+    def compute_state_root(self) -> str:
+        """Compute a deterministic hash of the current on-chain state that affects consensus.
+        For our purposes, include stakes and votes (sorted) to simulate a state root like in real blockchains.
+        """
+        try:
+            # Sort keys for deterministic hashing
+            state = {
+                "stakes": {k: float(v) for k, v in sorted(self.stakes.items())},
+                "votes": {k: v for k, v in sorted(self.votes.items())},
+                "delegates": list(sorted(self.delegates or [])),
+            }
+            payload = json.dumps(state, sort_keys=True, separators=(",", ":"))
+            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        except Exception:
+            # Fallback to time-based value if something unexpected occurs (shouldn't happen)
+            return hashlib.sha256(str(time.time()).encode("utf-8")).hexdigest()

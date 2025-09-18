@@ -397,17 +397,36 @@ def consensus_page():
             v_did = st.selectbox("Doctor (candidate)", doc_ids, key="vote_did")
         with c3:
             if st.button("Cast Vote"):
-                ok, msg = bc.set_vote(v_pid, v_did)
-                if ok:
-                    bc.save_state(); st.success("Vote recorded")
+                try:
+                    if hasattr(bc, "set_vote"):
+                        ok, msg = bc.set_vote(v_pid, v_did)
+                    else:
+                        # Local fallback: validate and update bc.votes
+                        ok = True; msg = "Vote recorded"
+                        if not (hasattr(bc, "is_patient") and bc.is_patient(v_pid)):
+                            ok, msg = False, "Patient not found"
+                        elif not (hasattr(bc, "is_doctor") and bc.is_doctor(v_did)):
+                            ok, msg = False, "Doctor not found"
+                        if ok:
+                            if not hasattr(bc, "votes") or bc.votes is None:
+                                bc.votes = {}
+                            bc.votes[v_pid] = v_did
+                    if ok:
+                        bc.save_state(); st.success("Vote recorded")
+                        try:
+                            bc.log_access(v_pid, "VOTE_CAST", v_did, True, weight=bc.get_stake(v_pid))
+                        except Exception:
+                            pass
+                    else:
+                        st.error(msg)
+                        try:
+                            bc.log_access(v_pid, "VOTE_CAST", v_did, False, reason=msg)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    st.error(f"Failed to cast vote: {e}")
                     try:
-                        bc.log_access(v_pid, "VOTE_CAST", v_did, True, weight=bc.get_stake(v_pid))
-                    except Exception:
-                        pass
-                else:
-                    st.error(msg)
-                    try:
-                        bc.log_access(v_pid, "VOTE_CAST", v_did, False, reason=msg)
+                        bc.log_access(v_pid, "VOTE_CAST", v_did, False, reason=str(e))
                     except Exception:
                         pass
 

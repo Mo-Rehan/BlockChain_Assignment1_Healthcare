@@ -91,10 +91,10 @@ def app_header():
         [data-testid="stSidebar"] label { color: var(--card-fg) !important; }
         [data-testid="stSidebar"] .stRadio > div { background: var(--node-bg); }
         [data-testid="stSidebar"] .stRadio > div > label { color: var(--card-fg) !important; }
-        /* Dropdown menu text color */
-        .stSelectbox [data-baseweb="select"] div { color: #000000 !important; }
-        .stSelectbox [data-baseweb="select"] svg { fill: #000000 !important; }
-        .stSelectbox [data-baseweb="popover"] div { color: #000000 !important; }
+        /* Role selection dropdown text color */
+        [data-baseweb="select"] div[aria-selected] { color: #000000 !important; }
+        [data-baseweb="select"] div[role="option"] { color: #000000 !important; }
+        [data-baseweb="select"] svg { fill: #000000 !important; }
         .block-container { background: transparent !important; }
         /* Make general text readable on dark */
         .block-container, .stMarkdown, .stText, .stWrite, p, li, h1, h2, h3, h4, h5, h6 { color: var(--card-fg) !important; }

@@ -125,7 +125,6 @@ def dashboard():
                 <div class='kv'>hash: {fmt(bhash)}</div>
                 <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
                 <div class='kv'>mode: {mode} | delegate: {producer}</div>
-                <div class='kv'>tx: {len(blk.transactions)}</div>
             </div>
             """
             html.append(node)
@@ -409,7 +408,6 @@ def chain_page():
             <div class='kv'>hash: {fmt(bhash)}</div>
             <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
             <div class='kv'>mode: {mode} | delegate: {producer}</div>
-            <div class='kv'>tx: {len(blk.transactions)}</div>
         </div>
         """
         html.append(node)

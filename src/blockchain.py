@@ -199,31 +199,29 @@ class Blockchain:
         except Exception:
             pass
 
-        # Distribute block rewards: producer keeps (1-share_ratio), supporters (patients who voted for producer) share 'share_ratio' by stake
+        # Distribute block rewards INTO STAKES: producer keeps (1-share_ratio), supporters (patients who voted for producer) share 'share_ratio' equally
         try:
             total_reward = float(self.block_reward)
             share_ratio = float(self.share_ratio)
             prod_share = total_reward * (1.0 - share_ratio)
             supporters_share = total_reward * share_ratio
-            # credit producer
-            if producer:
-                self.balances[producer] = float(self.balances.get(producer, 0.0)) + prod_share
             # supporters: voters who voted for producer and are patients
             supporters = [pid for pid, did in (self.votes or {}).items() if did == producer and self.is_patient(pid)]
-            weights = {pid: float(self.get_stake(pid)) for pid in supporters}
-            total_weight = sum(weights.values())
+            supporters_count = len(supporters)
+            # Update stakes: producer and supporters
             breakdown = {}
-            if total_weight > 0 and supporters_share > 0:
-                for pid, w in weights.items():
-                    amt = supporters_share * (w / total_weight)
-                    if amt <= 0:
-                        continue
-                    self.balances[pid] = float(self.balances.get(pid, 0.0)) + amt
-                    breakdown[pid] = round(amt, 6)
+            # credit producer's stake with producer share (+ possibly leftover if no supporters)
+            if producer:
+                self.stakes[producer] = float(self.get_stake(producer)) + prod_share
+            if supporters_count > 0 and supporters_share > 0:
+                equal_share = supporters_share / supporters_count
+                for pid in supporters:
+                    self.stakes[pid] = float(self.get_stake(pid)) + equal_share
+                    breakdown[pid] = round(equal_share, 6)
             else:
-                # no supporters with stake: give all to producer
-                if producer:
-                    self.balances[producer] = float(self.balances.get(producer, 0.0)) + supporters_share
+                # no supporters: add entire supporters' share to producer stake
+                if producer and supporters_share > 0:
+                    self.stakes[producer] = float(self.get_stake(producer)) + supporters_share
             # Log reward distribution
             try:
                 self.log_access(
@@ -235,8 +233,9 @@ class Blockchain:
                     total_reward=total_reward,
                     producer_share=round(prod_share, 6),
                     supporters_share=round(supporters_share, 6),
-                    supporters_count=len(supporters),
+                    supporters_count=supporters_count,
                     breakdown=breakdown,
+                    stakes={k: round(float(v), 6) for k, v in self.stakes.items()},
                 )
             except Exception:
                 pass

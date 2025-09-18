@@ -433,14 +433,41 @@ def consensus_page():
         top_n_votes = st.number_input("Delegates to select from votes", min_value=1, value=max(1, len(bc.delegates) or 1), step=1)
     with c2:
         if st.button("Select Delegates from Votes"):
-            new_delegates = bc.select_delegates_from_votes(int(top_n_votes), prefer_existing=True)
-            before = list(set(bc.delegates) - set(new_delegates))  # for log context
-            bc.save_state()
-            st.success(f"Delegates from votes: {', '.join(new_delegates) if new_delegates else '(none)'}")
             try:
-                bc.log_access("system", "DELEGATES_FROM_VOTES", "-", True, selected=new_delegates, top_n=int(top_n_votes))
-            except Exception:
-                pass
+                if hasattr(bc, "select_delegates_from_votes"):
+                    new_delegates = bc.select_delegates_from_votes(int(top_n_votes), prefer_existing=True)
+                else:
+                    # Fallback: compute selection locally if method missing
+                    votes = getattr(bc, "votes", {}) or {}
+                    doctor_ids = {d.get("id") for d in bc.users.get("doctors", [])}
+                    # Tally weights by doctor (sum of patient stakes)
+                    weights = {}
+                    for pid, did in votes.items():
+                        if did not in doctor_ids:
+                            continue
+                        w = 0.0
+                        if hasattr(bc, "get_stake"):
+                            try:
+                                w = float(bc.get_stake(pid))
+                            except Exception:
+                                w = 0.0
+                        weights[did] = weights.get(did, 0.0) + w
+                    old_set = set(bc.delegates)
+                    ranked = sorted(weights.items(), key=lambda kv: (-kv[1], ('' if kv[0] in old_set else 'z'), kv[0]))
+                    new_delegates = [did for did, _ in ranked[: int(top_n_votes)]]
+                    bc.delegates = new_delegates
+                bc.save_state()
+                st.success(f"Delegates from votes: {', '.join(new_delegates) if new_delegates else '(none)'}")
+                try:
+                    bc.log_access("system", "DELEGATES_FROM_VOTES", "-", True, selected=new_delegates, top_n=int(top_n_votes))
+                except Exception:
+                    pass
+            except Exception as e:
+                st.error(f"Failed to select delegates from votes: {e}")
+                try:
+                    bc.log_access("system", "DELEGATES_FROM_VOTES", "-", False, reason=str(e))
+                except Exception:
+                    pass
 
 
 def records_page():

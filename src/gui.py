@@ -154,20 +154,20 @@ def dashboard():
                     patient = next((p for p in bc.users.get("patients", []) if p.get("id") == pid), None)
                     if patient and did in patient.get("consent", []):
                         consent_pairs_pd.append(f"{pid}→{did}")
-            node = f"""
-            <div class='chain-node'>
-                <h4>BLOCK {blk.index}</h4>
-                <div class='kv'>time: {blk.timestamp}</div>
-                <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
-                <div class='kv'>hash: {fmt(bhash)}</div>
-                <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
-                <div class='kv'>mode: {mode} | delegate: {producer}</div>
-                <div class='kv'>action: {action}</div>
-                <div class='kv'>reason: {reason}</div>
-                {f"<div class='kv'>consent pairs: {', '.join(consent_pairs_pd)}</div>" if consent_pairs_pd else ""}
-            </div>
-            """
-            html.append(node)
+            # node = f"""
+            # <div class='chain-node'>
+            #     <h4>BLOCK {blk.index}</h4>
+            #     <div class='kv'>time: {blk.timestamp}</div>
+            #     <div class='kv'>prev: {fmt(blk.prev_hash)}</div>
+            #     <div class='kv'>hash: {fmt(bhash)}</div>
+            #     <div class='kv'>merkle: {fmt(blk.merkle_root)}</div>
+            #     <div class='kv'>mode: {mode} | delegate: {producer}</div>
+            #     <div class='kv'>action: {action}</div>
+            #     <div class='kv'>reason: {reason}</div>
+            #     {f"<div class='kv'>consent pairs: {', '.join(consent_pairs_pd)}</div>" if consent_pairs_pd else ""}
+            # </div>
+            # """
+            # html.append(node)
             if i < len(bc.chain) - 1:
                 html.append("<div class='connector'></div>")
         html.append("</div>")

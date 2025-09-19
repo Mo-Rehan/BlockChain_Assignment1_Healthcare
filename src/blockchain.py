@@ -245,6 +245,8 @@ class Blockchain:
             supporters_share = total_reward * share_ratio
             # supporters: voters who voted for producer and are patients
             supporters = [pid for pid, did in (self.votes or {}).items() if did == producer and self.is_patient(pid)]
+            # Ensure deterministic order for consistent rounding remainder assignment
+            supporters = sorted(set(supporters))
             supporters_count = len(supporters)
             # Update stakes: producer and supporters (proportional to supporter stake)
             breakdown = {}
@@ -252,30 +254,57 @@ class Blockchain:
             if producer:
                 self.stakes[producer] = float(self.get_stake(producer)) + prod_share
             if supporters_count > 0 and supporters_share > 0:
-                # Equal split among all supporters (not weighted by stake)
-                amt_each = supporters_share / supporters_count
+                # Equal split among all supporters with rounding compensation on the last supporter
+                raw_each = supporters_share / supporters_count
+                amt_each = round(raw_each, 6)
                 if amt_each > 0:
-                    for pid in supporters:
-                        new_stake = float(self.get_stake(pid)) + amt_each
+                    total_assigned = 0.0
+                    # Assign rounded equal amount to all but the last supporter
+                    for pid in supporters[:-1]:
+                        reward = amt_each
+                        new_stake = float(self.get_stake(pid)) + reward
                         self.stakes[pid] = new_stake
-                        breakdown[pid] = round(amt_each, 6)
-                        # Per-patient log line in requested format
+                        breakdown[pid] = reward
+                        total_assigned += reward
+                        # Per-patient log line
                         try:
                             self.log_access(
                                 user_id=pid,
                                 action="REWARD_DISTRIBUTED",
                                 record_id=str(block.index),
                                 success=True,
-                                message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {pid} reward = {round(amt_each,6)}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
+                                message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {pid} reward = {reward:.6f}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
                                 producer=producer,
                                 patient=pid,
                                 doctor_reward=round(prod_share, 6),
-                                patient_reward=round(amt_each, 6),
+                                patient_reward=round(reward, 6),
                                 doctor_stake=round(float(self.get_stake(producer)), 6),
                                 patient_stake=round(new_stake, 6),
                             )
                         except Exception:
                             pass
+                    # Last supporter gets the remainder to ensure exact sum equals supporters_share
+                    last_pid = supporters[-1]
+                    remainder = round(supporters_share - total_assigned, 6)
+                    new_stake = float(self.get_stake(last_pid)) + remainder
+                    self.stakes[last_pid] = new_stake
+                    breakdown[last_pid] = remainder
+                    try:
+                        self.log_access(
+                            user_id=last_pid,
+                            action="REWARD_DISTRIBUTED",
+                            record_id=str(block.index),
+                            success=True,
+                            message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {last_pid} reward = {remainder:.6f}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
+                            producer=producer,
+                            patient=last_pid,
+                            doctor_reward=round(prod_share, 6),
+                            patient_reward=round(remainder, 6),
+                            doctor_stake=round(float(self.get_stake(producer)), 6),
+                            patient_stake=round(new_stake, 6),
+                        )
+                    except Exception:
+                        pass
             else:
                 # no supporters: add entire supporters' share to producer stake
                 if producer and supporters_share > 0:

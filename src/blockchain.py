@@ -140,32 +140,11 @@ class Blockchain:
             print("Create genesis block first")
             return None
 
-        # If DPoS, ensure the block is from the expected producer
+        # If DPoS, ensure scheduling is configured; producer will be the scheduled delegate,
+        # not necessarily the prescribing doctor in the transaction.
         if self.consensus_mode == "DPoS":
             if not hasattr(self, 'delegates') or not self.delegates:
                 print("Block rejected: No delegates selected. Use 'Select Delegates from Votes' first.")
-                return None
-                
-            # Check if producer is in current delegates
-            producer = None
-            for tx in transactions:
-                if tx.get("doctor_id"):
-                    producer = tx["doctor_id"]
-                    break
-                    
-            if not producer:
-                print("Block rejected: No producer found in transactions")
-                return None
-                
-            # Get expected producer and winners list
-            exp_prod, winners = self.current_expected_producer()
-            
-            if not winners:
-                print("Block rejected: No winners available to produce blocks")
-                return None
-                
-            if producer != exp_prod:
-                print(f"Block rejected: Expected producer {exp_prod}, got {producer}")
                 return None
                 
         # DPoS is the only supported consensus mechanism for this assignment

@@ -593,19 +593,7 @@ def records_page():
             perm_ok, reason = validate_access_permissions(bc, doctor_id, patient_id)
             if not perm_ok:
                 st.error(f"Access denied: {reason}"); bc.log_access(doctor_id, "WRITE", record_id, False, reason=reason); return
-            # Enforce winners-only producer if DPoS
-            if bc.consensus_mode == "DPoS" and hasattr(bc, "current_expected_producer"):
-                try:
-                    exp, winners = bc.current_expected_producer()
-                    if winners and doctor_id != exp:
-                        st.error(f"Only current expected producer can add a block right now. Expected: {exp}")
-                        try:
-                            bc.log_access(doctor_id, "WRITE", record_id, False, reason="not_current_producer", expected=exp)
-                        except Exception:
-                            pass
-                        return
-                except Exception:
-                    pass
+            # Note: Any consented doctor may submit a record. The elected delegate (DPoS) will produce the block.
             blk = bc.add_block_with_consensus([tx])
             if blk:
                 st.success(f"Added in block {blk.index}")
@@ -651,19 +639,7 @@ def records_page():
                 except Exception:
                     pass
                 return
-            # Enforce winners-only producer for emergency as well
-            if bc.consensus_mode == "DPoS" and hasattr(bc, "current_expected_producer"):
-                try:
-                    exp, winners = bc.current_expected_producer()
-                    if winners and ed.strip() != exp:
-                        st.error(f"Only current expected producer can add a block right now. Expected: {exp}")
-                        try:
-                            bc.log_access(ed.strip(), "EMERGENCY_WRITE", er.strip(), False, reason="not_current_producer", expected=exp)
-                        except Exception:
-                            pass
-                        return
-                except Exception:
-                    pass
+            # Note: Any consented doctor may submit an emergency record. The elected delegate (DPoS) will produce the block.
             tx = {
                 "hospital_id": eh.strip(),
                 "doctor_id": ed.strip(),

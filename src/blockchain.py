@@ -44,6 +44,8 @@ class Blockchain:
         self.share_ratio: float = 0.30    # fraction shared to supporters
         # Account balances (for doctors/patients/admins)
         self.balances: dict[str, float] = {}
+        # Number of top vote winners to include in rotation when no delegates are configured
+        self.active_winners_n: int = 3
         
         # Initialize stakes for all users
         self._init_stakes()
@@ -140,33 +142,44 @@ class Blockchain:
             print("Create genesis block first")
             return None
 
-        # If DPoS, ensure scheduling is configured; producer will be the scheduled delegate,
-        # not necessarily the prescribing doctor in the transaction.
+        # If DPoS, proceed; producer will be selected from delegates if configured,
+        # otherwise from vote winners (fallback). The prescribing doctor need not be the producer.
         if self.consensus_mode == "DPoS":
-            if not hasattr(self, 'delegates') or not self.delegates:
-                print("Block rejected: No delegates selected. Use 'Select Delegates from Votes' first.")
-                return None
+            if not hasattr(self, 'delegates'):
+                self.delegates = []
                 
         # DPoS is the only supported consensus mechanism for this assignment
         mode = self.consensus_mode
         consensus_meta = {"mode": mode}
         producer = None
         if mode == "DPoS":
-            # Winners-only scheduling: compute tied top winners from votes (patients' stake weights)
-            winners = self.get_winners_set()
-            if winners:
-                # Round-robin among winners only
-                if self.winners_pointer >= len(winners) or self.winners_pointer < 0:
-                    self.winners_pointer = 0
-                pointer_before = self.winners_pointer
-                producer = winners[self.winners_pointer]
-                self.winners_pointer = (self.winners_pointer + 1) % len(winners)
-                consensus_meta["winners"] = winners
-                consensus_meta["winner_pointer_before"] = pointer_before
-                consensus_meta["winner_pointer_after"] = self.winners_pointer
+            # Prefer rotating among configured delegates; fallback to winners-only rotation
+            if self.delegates:
+                if self.producer_pointer >= len(self.delegates) or self.producer_pointer < 0:
+                    self.producer_pointer = 0
+                pointer_before = self.producer_pointer
+                producer = self.delegates[self.producer_pointer]
+                self.producer_pointer = (self.producer_pointer + 1) % len(self.delegates)
+                consensus_meta["schedule"] = "delegates"
+                consensus_meta["delegates"] = list(self.delegates)
+                consensus_meta["delegate_pointer_before"] = pointer_before
+                consensus_meta["delegate_pointer_after"] = self.producer_pointer
             else:
-                print("No winners from votes. Cannot produce block under winners-only scheduling.")
-                return None
+                # Winners-only scheduling: compute tied top winners from votes (patients' stake weights)
+                winners = self.get_winners_set()
+                if winners:
+                    if self.winners_pointer >= len(winners) or self.winners_pointer < 0:
+                        self.winners_pointer = 0
+                    pointer_before = self.winners_pointer
+                    producer = winners[self.winners_pointer]
+                    self.winners_pointer = (self.winners_pointer + 1) % len(winners)
+                    consensus_meta["schedule"] = "winners"
+                    consensus_meta["winners"] = winners
+                    consensus_meta["winner_pointer_before"] = pointer_before
+                    consensus_meta["winner_pointer_after"] = self.winners_pointer
+                else:
+                    print("No winners from votes. Cannot produce block; configure delegates or votes.")
+                    return None
         else:
             print("Only DPoS consensus is supported in this healthcare blockchain.")
             print("Please configure DPoS consensus first.")
@@ -387,6 +400,7 @@ class Blockchain:
             "block_reward": self.block_reward,
             "share_ratio": self.share_ratio,
             "balances": self.balances,
+            "active_winners_n": self.active_winners_n,
         }
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
@@ -436,6 +450,8 @@ class Blockchain:
         self.block_reward = float(data.get("block_reward", 100.0))
         self.share_ratio = float(data.get("share_ratio", 0.30))
         self.balances = data.get("balances", {})
+        # Load active winners set size (fallback to 3)
+        self.active_winners_n = int(data.get("active_winners_n", 3) or 3)
 
         # Rebuild chain; recompute tx_hashes/merkle and warn if mismatch with stored merkle root
         self.chain = []
@@ -535,21 +551,36 @@ class Blockchain:
         self.delegates = new_delegates
         return new_delegates
 
-    def get_winners_set(self) -> list[str]:
-        """Return the set of doctors that have the maximum vote weight.
-        Sorted deterministically by doctor_id ascending for stable round-robin.
+    def get_winners_set(self, n: int | None = None) -> list[str]:
+        """Return the top-N doctors by vote weight for rotation.
+        N defaults to self.active_winners_n. Sorted deterministically by (-weight, doctor_id).
+        Only doctors with positive weight are considered.
         """
         tally = self.tally_votes()
         if not tally:
             return []
-        max_w = max(float(meta.get("weight", 0.0)) for meta in tally.values())
-        winners = [did for did, meta in tally.items() if float(meta.get("weight", 0.0)) == max_w and self.is_doctor(did)]
-        winners = sorted(set(winners))
-        return winners
+        n = self.active_winners_n if n is None else int(n)
+        if n <= 0:
+            return []
+        ranked = sorted(
+            [(did, float(meta.get("weight", 0.0))) for did, meta in tally.items() if self.is_doctor(did) and float(meta.get("weight", 0.0)) > 0.0],
+            key=lambda kv: (-kv[1], kv[0])
+        )
+        return [did for did, _ in ranked[:n]]
 
     def current_expected_producer(self) -> tuple[str | None, list[str]]:
         """Compute the current expected producer without advancing pointers.
-        Returns (producer_id_or_None, winners_list)."""
+        Prefers delegates rotation; falls back to winners rotation. Returns (producer_id_or_None, rotation_list)."""
+        # Delegates rotation (no pointer advance)
+        if getattr(self, 'delegates', None):
+            delegates = list(self.delegates)
+            if not delegates:
+                return None, []
+            idx = self.producer_pointer
+            if idx < 0 or idx >= len(delegates):
+                idx = 0
+            return delegates[idx], delegates
+        # Winners rotation fallback
         winners = self.get_winners_set()
         if not winners:
             return None, winners

@@ -469,6 +469,33 @@ def consensus_page():
     # Manual refresh (useful after rewards update to see new stakes reflected immediately)
     st.button("Refresh Tallies")
 
+    # Winners rotation configuration (used when no delegates are configured)
+    st.markdown("---")
+    st.subheader("Winners Rotation Settings")
+    current_n = getattr(bc, "active_winners_n", 3)
+    col1, col2 = st.columns([1,1])
+    with col1:
+        new_n = st.number_input("Top-N winners to rotate (fallback schedule)", min_value=1, max_value=50, value=int(current_n), step=1)
+    with col2:
+        if st.button("Apply Winners Rotation N"):
+            try:
+                bc.active_winners_n = int(new_n)
+                bc.save_state()
+                bc.log_access("system", "WINNERS_ROTATION_SET", str(new_n), True)
+                st.success(f"Set winners rotation to top-{int(new_n)}")
+            except Exception as e:
+                st.error(f"Failed to set winners rotation: {e}")
+
+    # Display current scheduling mode info
+    try:
+        if bc.delegates:
+            st.caption("Scheduling: Delegates rotation is active.")
+        else:
+            winners = bc.get_winners_set() if hasattr(bc, "get_winners_set") else []
+            st.caption(f"Scheduling: Winners rotation (top-{getattr(bc, 'active_winners_n', 3)}) | Current winners: {', '.join(winners) if winners else '(none)'}")
+    except Exception:
+        pass
+
     # Show weighted tally
     tally = bc.tally_votes() if hasattr(bc, "tally_votes") else {}
     if tally:

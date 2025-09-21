@@ -372,15 +372,15 @@ def consensus_page():
                 pass
 
     st.markdown("---")
-    st.caption("Auto-select top-N delegates by stake (doctors only)")
+    st.caption("Auto-select top-N delegates by stake (admins only)")
     c1, c2 = st.columns([1,1])
     with c1:
         top_n = st.number_input("Number of delegates", min_value=1, value=max(1, len(bc.delegates) or 1), step=1)
     with c2:
         if st.button("Auto-Select Delegates by Stake"):
-            # Rank doctors by stake (desc) and pick top N distinct IDs
-            doctor_rows = bc.users.get("doctors", [])
-            ranked = sorted(((d.get("id"), bc.get_stake(d.get("id"))) for d in doctor_rows), key=lambda x: x[1], reverse=True)
+            # Rank admins by stake (desc) and pick top N distinct IDs
+            admin_rows = bc.users.get("admins", [])
+            ranked = sorted(((a.get("id"), bc.get_stake(a.get("id"))) for a in admin_rows), key=lambda x: x[1], reverse=True)
             new_delegates = [uid for uid, stake in ranked if stake > 0][: int(top_n)]
             before = list(bc.delegates)
             bc.delegates = new_delegates
@@ -412,25 +412,25 @@ def consensus_page():
             pass
 
     st.markdown("---")
-    st.subheader("Voting (Patients vote for Doctor Delegates)")
+    st.subheader("Voting (Patients vote for Admin Delegates)")
     # Voting form: any registered user chooses a doctor to vote for. Vote weight = voter's stake.
     all_voters = (
         [(u.get("id"), u.get("name"), "patient") for u in bc.users.get("patients", [])]
         + [(u.get("id"), u.get("name"), "doctor") for u in bc.users.get("doctors", [])]
         + [(u.get("id"), u.get("name"), "admin") for u in bc.users.get("admins", [])]
     )
-    doc_ids = [d.get("id") for d in bc.users.get("doctors", [])]
-    if not all_voters or not doc_ids:
-        st.info("Register at least one patient and one doctor to enable voting.")
+    admin_ids = [a.get("id") for a in bc.users.get("admins", [])]
+    if not all_voters or not admin_ids:
+        st.info("Register at least one patient and one admin to enable voting.")
     else:
         c1, c2, c3 = st.columns([1,1,1])
         voter_options = {vid: f"{role.title()}: {vid} - {name} (stake={bc.get_stake(vid)})" for vid, name, role in all_voters}
-        doc_options = {did: f"Doctor: {did} (stake={bc.get_stake(did)})" for did in doc_ids}
+        admin_options = {aid: f"Admin: {aid} (stake={bc.get_stake(aid)})" for aid in admin_ids}
         with c1:
             v_pid = st.selectbox("Voter", list(voter_options.keys()), format_func=lambda k: voter_options[k], key="vote_pid")
             st.caption(f"Stake weight: {bc.get_stake(v_pid)}")
         with c2:
-            v_did = st.selectbox("Doctor (candidate)", list(doc_options.keys()), format_func=lambda k: doc_options[k], key="vote_did")
+            v_did = st.selectbox("Admin (candidate)", list(admin_options.keys()), format_func=lambda k: admin_options[k], key="vote_did")
         with c3:
             if st.button("Cast Vote"):
                 try:
@@ -441,8 +441,8 @@ def consensus_page():
                         ok = True; msg = "Vote recorded"
                         if not (hasattr(bc, "is_patient") and bc.is_patient(v_pid)):
                             ok, msg = False, "Patient not found"
-                        elif not (hasattr(bc, "is_doctor") and bc.is_doctor(v_did)):
-                            ok, msg = False, "Doctor not found"
+                        elif not (hasattr(bc, "is_admin") and bc.is_admin(v_did)):
+                            ok, msg = False, "Admin not found"
                         if ok:
                             if not hasattr(bc, "votes") or bc.votes is None:
                                 bc.votes = {}
@@ -502,13 +502,13 @@ def consensus_page():
         rows = []
         for did, meta in tally.items():
             rows.append({
-                "doctor": did,
+                "admin": did,
                 "weight": round(float(meta.get("weight", 0.0)), 4),
                 "votes": int(meta.get("count", 0)),
                 "stake": bc.get_stake(did),
                 "is_current_delegate": did in bc.delegates,
             })
-        st.table(sorted(rows, key=lambda r: (-r["weight"], r["doctor"])) )
+        st.table(sorted(rows, key=lambda r: (-r["weight"], r["admin"])) )
     else:
         st.caption("No votes yet.")
 
@@ -549,11 +549,11 @@ def consensus_page():
                 else:
                     # Fallback: compute selection locally if method missing
                     votes = getattr(bc, "votes", {}) or {}
-                    doctor_ids = {d.get("id") for d in bc.users.get("doctors", [])}
+                    admin_ids_set = {a.get("id") for a in bc.users.get("admins", [])}
                     # Tally weights by doctor (sum of patient stakes)
                     weights = {}
                     for pid, did in votes.items():
-                        if did not in doctor_ids:
+                        if did not in admin_ids_set:
                             continue
                         w = 0.0
                         if hasattr(bc, "get_stake"):

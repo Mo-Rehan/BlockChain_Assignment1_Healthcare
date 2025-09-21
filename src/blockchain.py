@@ -265,43 +265,38 @@ class Blockchain:
                                 action="REWARD_DISTRIBUTED",
                                 record_id=str(block.index),
                                 success=True,
-                                message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {pid} reward = {reward:.6f}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
+                                message=f"Block created by Admin {producer}. Admin reward = {round(prod_share,6)}, Patient {pid} reward = {reward:.6f}. Admin total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
                                 producer=producer,
                                 patient=pid,
-                                doctor_reward=round(prod_share, 6),
+                                admin_reward=round(prod_share, 6),
                                 patient_reward=round(reward, 6),
-                                doctor_stake=round(float(self.get_stake(producer)), 6),
+                                admin_stake=round(float(self.get_stake(producer)), 6),
                                 patient_stake=round(new_stake, 6),
                             )
                         except Exception:
                             pass
-                    # Last supporter gets the remainder to ensure exact sum equals supporters_share
-                    last_pid = supporters[-1]
-                    remainder = round(supporters_share - total_assigned, 6)
-                    new_stake = float(self.get_stake(last_pid)) + remainder
-                    self.stakes[last_pid] = new_stake
-                    breakdown[last_pid] = remainder
-                    try:
-                        self.log_access(
-                            user_id=last_pid,
-                            action="REWARD_DISTRIBUTED",
-                            record_id=str(block.index),
-                            success=True,
-                            message=f"Block created by Doctor {producer}. Doctor reward = {round(prod_share,6)}, Patient {last_pid} reward = {remainder:.6f}. Doctor total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
-                            producer=producer,
-                            patient=last_pid,
-                            doctor_reward=round(prod_share, 6),
-                            patient_reward=round(remainder, 6),
-                            doctor_stake=round(float(self.get_stake(producer)), 6),
-                            patient_stake=round(new_stake, 6),
-                        )
-                    except Exception:
-                        pass
-            else:
-                # no supporters: add entire supporters' share to producer stake
-                if producer and supporters_share > 0:
-                    self.stakes[producer] = float(self.get_stake(producer)) + supporters_share
-            # Summary Log reward distribution
+                # Last supporter gets the remainder to ensure exact sum equals supporters_share
+                last_pid = supporters[-1]
+                remainder = round(supporters_share - total_assigned, 6)
+                new_stake = float(self.get_stake(last_pid)) + remainder
+                self.stakes[last_pid] = new_stake
+                breakdown[last_pid] = remainder
+                try:
+                    self.log_access(
+                        user_id=last_pid,
+                        action="REWARD_DISTRIBUTED",
+                        record_id=str(block.index),
+                        success=True,
+                        message=f"Block created by Admin {producer}. Admin reward = {round(prod_share,6)}, Patient {last_pid} reward = {remainder:.6f}. Admin total stake = {round(float(self.get_stake(producer)),6)}, Patient total stake = {round(new_stake,6)}.",
+                        producer=producer,
+                        patient=last_pid,
+                        admin_reward=round(prod_share, 6),
+                        patient_reward=round(remainder, 6),
+                        admin_stake=round(float(self.get_stake(producer)), 6),
+                        patient_stake=round(new_stake, 6),
+                    )
+                except Exception:
+                    pass
             try:
                 self.log_access(
                     user_id=producer or "system",
@@ -506,24 +501,24 @@ class Blockchain:
         """Stake cap feature removed. This is a no-op kept for backward compatibility."""
         return []
 
-    # --- Voting (patients vote for doctor delegates, weighted by patient stake) ---
+    # --- Voting (patients vote for admin delegates, weighted by patient stake) ---
     def set_vote(self, voter_id: str, candidate_id: str) -> tuple[bool, str]:
         # Any registered user can vote
         if not self.find_user(voter_id):
             return False, "Voter not found"
-        # Candidate must be a doctor (keeping producer role consistent)
-        if not self.find_user(candidate_id) or not self.is_doctor(candidate_id):
-            return False, "Doctor (candidate) not found"
+        # Candidate must be an admin (producer role now uses admin nodes)
+        if not self.find_user(candidate_id) or not self.is_admin(candidate_id):
+            return False, "Admin (candidate) not found"
         self.votes[voter_id] = candidate_id
         return True, "Vote recorded"
 
     def tally_votes(self) -> dict:
-        """Return a dict: doctor_id -> { 'weight': sum_stake, 'count': num_votes }"""
+        """Return a dict: admin_id -> { 'weight': sum_stake, 'count': num_votes }"""
         tally: dict[str, dict] = {}
         for pid, did in self.votes.items():
-            if not self.is_doctor(did):
+            if not self.is_admin(did):
                 continue
-            # weight = patient stake
+            # weight = voter stake (typically patient)
             w = self.get_stake(pid)
             if did not in tally:
                 tally[did] = {"weight": 0.0, "count": 0}
@@ -532,13 +527,13 @@ class Blockchain:
         return tally
 
     def select_delegates_from_votes(self, top_n: int, prefer_existing: bool = True) -> list[str]:
-        """Select top-N doctor delegates based on patient-weighted votes.
-        Tie-breaker: prefer existing delegates if prefer_existing, then by doctor_id ascending.
+        """Select top-N admin delegates based on patient-weighted votes.
+        Tie-breaker: prefer existing delegates if prefer_existing, then by admin_id ascending.
         Updates self.delegates and returns the new list.
         """
         tally = self.tally_votes()
-        # Build list of (doctor_id, weight, count)
-        candidates = [(did, meta.get("weight", 0.0), meta.get("count", 0)) for did, meta in tally.items() if self.is_doctor(did)]
+        # Build list of (admin_id, weight, count)
+        candidates = [(did, meta.get("weight", 0.0), meta.get("count", 0)) for did, meta in tally.items() if self.is_admin(did)]
         old = list(self.delegates)
         def sort_key(item):
             did, weight, cnt = item
@@ -552,9 +547,9 @@ class Blockchain:
         return new_delegates
 
     def get_winners_set(self, n: int | None = None) -> list[str]:
-        """Return the top-N doctors by vote weight for rotation.
-        N defaults to self.active_winners_n. Sorted deterministically by (-weight, doctor_id).
-        Only doctors with positive weight are considered.
+        """Return the top-N admins by vote weight for rotation.
+        N defaults to self.active_winners_n. Sorted deterministically by (-weight, admin_id).
+        Only admins with positive weight are considered.
         """
         tally = self.tally_votes()
         if not tally:
@@ -563,7 +558,7 @@ class Blockchain:
         if n <= 0:
             return []
         ranked = sorted(
-            [(did, float(meta.get("weight", 0.0))) for did, meta in tally.items() if self.is_doctor(did) and float(meta.get("weight", 0.0)) > 0.0],
+            [(did, float(meta.get("weight", 0.0))) for did, meta in tally.items() if self.is_admin(did) and float(meta.get("weight", 0.0)) > 0.0],
             key=lambda kv: (-kv[1], kv[0])
         )
         return [did for did, _ in ranked[:n]]
